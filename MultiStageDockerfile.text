@@ -1,0 +1,68 @@
+# ================================
+# Stage 1: Frontend Build (Vite)
+# ================================
+FROM node:22-alpine AS frontend_builder
+
+WORKDIR /app
+
+# Install frontend dependencies (cached layer)
+COPY package.json package-lock.json vite.config.js ./
+RUN npm ci
+
+# Copy frontend resources and build
+COPY resources ./resources
+COPY public ./public
+RUN npm run build
+
+
+# ================================
+# Stage 2: Production (PHP-FPM)
+# ================================
+FROM php:8.4-fpm-alpine
+
+WORKDIR /var/www
+ENV DEBIAN_FRONTEND=noninteractive
+
+# System dependencies and PHP extensions
+RUN apk add --no-cache \
+    python3 netcat-openbsd fcgi git curl zip unzip \
+    libzip-dev libpng-dev libjpeg-turbo-dev freetype-dev libwebp-dev \
+    postgresql-dev icu-dev oniguruma-dev \
+    build-base autoconf bash shadow && \
+    docker-php-ext-configure gd --with-freetype --with-jpeg --with-webp && \
+    docker-php-ext-install -j$(nproc) \
+        gd pdo pdo_mysql pdo_pgsql mbstring exif pcntl bcmath zip intl && \
+    pecl install redis && docker-php-ext-enable redis
+
+# Composer binary
+COPY --from=composer:2.8.12 /usr/bin/composer /usr/bin/composer
+
+# PHP dependencies
+COPY composer.json composer.lock ./
+ARG INSTALL_DEV=false
+RUN if [ "$INSTALL_DEV" = "true" ]; then \
+        composer install --no-interaction --no-scripts --optimize-autoloader; \
+    else \
+        composer install --no-interaction --no-dev --no-scripts --optimize-autoloader; \
+    fi
+
+# Application source
+COPY . .
+
+# Compiled frontend assets
+COPY --from=frontend_builder /app/public/build /var/www/public/build
+
+# Optimized autoload
+RUN if [ "$INSTALL_DEV" = "true" ]; then \
+        composer dump-autoload; \
+    else \
+        composer dump-autoload --optimize; \
+    fi
+
+# Entrypoint
+COPY entrypoint.sh /usr/local/bin/entrypoint.sh
+RUN chmod +x /usr/local/bin/entrypoint.sh
+
+EXPOSE 9000
+ENTRYPOINT ["/usr/local/bin/entrypoint.sh"]
+CMD ["php-fpm"]

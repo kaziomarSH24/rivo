@@ -1,0 +1,75 @@
+<!-- /***
+ ** FCM Token Generator HTML
+ * This file is used to generate FCM token for testing push notifications.
+ * Save the generated token and use it in your backend to send test notifications.
+ */
+*/ -->
+<!DOCTYPE html>
+<html>
+    <head>
+        <title>FCM Token Generator</title>
+    </head>
+    <body>
+        <h1>Firebase Push Notification Test</h1>
+        <p>Check the browser console for your FCM token.</p>
+        <button onclick="requestPermission()">
+            Request Permission & Get Token
+        </button>
+
+        <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
+        <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-messaging.js"></script>
+
+        <script>
+            // firebase configuration from firebase console
+            const firebaseConfig = {
+                apiKey: "",
+                authDomain: "",
+                projectId: "",
+                storageBucket: "",
+                messagingSenderId: "",
+                appId: "",
+                measurementId: "",
+            };
+
+            // Firebase initialize
+            firebase.initializeApp(firebaseConfig);
+            const messaging = firebase.messaging();
+
+            function requestPermission() {
+                console.log("Requesting permission...");
+                Notification.requestPermission().then((permission) => {
+                    if (permission === "granted") {
+                        console.log("Notification permission granted.");
+
+                        // firebase cloud messaging VAPID key from firebase console
+                        const vapidKey ="Your-VAPID-Key-Here";
+
+                        // Get FCM token
+                        messaging
+                            .getToken({ vapidKey: vapidKey })
+                            .then((currentToken) => {
+                                if (currentToken) {
+                                    console.log("FCM Token:", currentToken);
+                                    alert(
+                                        "Token generated! Check the console."
+                                    );
+                                } else {
+                                    console.log(
+                                        "No registration token available. Request permission to generate one."
+                                    );
+                                }
+                            })
+                            .catch((err) => {
+                                console.log(
+                                    "An error occurred while retrieving token. ",
+                                    err
+                                );
+                            });
+                    } else {
+                        console.log("Unable to get permission to notify.");
+                    }
+                });
+            }
+        </script>
+    </body>
+</html>
