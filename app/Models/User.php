@@ -34,6 +34,8 @@ class User extends Authenticatable
     protected $fillable = [
         'name',
         'email',
+        'phone_number',
+        'country_code',
         'password',
         'otp',
         'otp_expires_at',
@@ -41,6 +43,9 @@ class User extends Authenticatable
         'email_verified_at',
         'is_active',
         'fcm_token',
+        'provider_name',
+        'provider_id',
+        'avatar',
     ];
 
     /**

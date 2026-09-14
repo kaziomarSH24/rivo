@@ -6,7 +6,7 @@ Comprehensive SaaS & realtime backend API (Auth, Roles, Chat, Stripe Billing, Su
     <strong>Base URL</strong>: <code>http://localhost:81</code>
 </aside>
 
-**Welcome to the Boilerplate API.**
+**Welcome to the Rivo API.**
 
 This backend covers: **Authentication**, **Profile**, **Roles & Permissions**, **Realtime Chat**, **Stripe One‑time & Subscription Billing**, **Invoices & Refunds**, **Payment Methods**, **Activity Log**, and **File Uploads**.
 

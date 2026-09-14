@@ -3,7 +3,7 @@ set -e
 
 # --- Database Wait Logic ---
 # Set default values if environment variables are not set
-DB_HOST_CHECK=${DB_HOST:-boilerplate-db}
+DB_HOST_CHECK=${DB_HOST:-rivo-db}
 DB_PORT_CHECK=${DB_PORT:-3306}
 
 echo "Attempting to connect to database at: ${DB_HOST_CHECK}:${DB_PORT_CHECK}"

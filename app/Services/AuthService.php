@@ -3,20 +3,22 @@
 namespace App\Services;
 
 use App\Models\User;
-use App\Notifications\Auth\SendOtpNotification;
-use App\Notifications\TestLoginPushNotification;
-use App\Traits\FileUploadTrait;
 use Carbon\Carbon;
-use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
+use App\Traits\FileUploadTrait;
+use Illuminate\Http\Request;
+use App\Notifications\Auth\SendOtpNotification;
+use App\Notifications\TestLoginPushNotification;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 use Illuminate\Validation\Rule;
+use Laravel\Socialite\Facades\Socialite;
 
 class AuthService
 {
     use FileUploadTrait;
+    
     /**
      * Registers a new user and sends OTP/verification link.
      */
@@ -26,9 +28,11 @@ class AuthService
         $token = Str::random(64);
 
         $user = User::create([
-            'name' => $data['name'],
-            'email' => $data['email'],
-            'password' => Hash::make($data['password']),
+            'name' => $data['name'] ?? 'User',
+            'email' => $data['email'] ?? null,
+            'phone_number' => $data['phone_number'] ?? null,
+            'country_code' => $data['country_code'] ?? null,
+            'password' => Hash::make($data['password'] ?? Str::random(10)),
             'otp' => $otp,
             'verification_token' => $token,
             'otp_expires_at' => Carbon::now()->addMinutes(10),
@@ -39,8 +43,12 @@ class AuthService
             $this->registerFcmToken($user, $data['fcm_token']);
         }
 
-        $user->assignRole('user');
-        $user->notify(new SendOtpNotification($otp, $token, 'verify your account', '/verify-email'));
+        $role = $data['user_type'] ?? 'user';
+        $user->assignRole($role);
+        
+        if ($user->email) {
+            $user->notify(new SendOtpNotification($otp, $token, 'verify your account', '/verify-email'));
+        }
 
         return $user;
     }
@@ -50,10 +58,16 @@ class AuthService
      */
     public function login(array $credentials): array
     {
-        $user = User::where('email', $credentials['email'])->first();
+        $user = User::when(isset($credentials['email']), function ($q) use ($credentials) {
+                        return $q->where('email', $credentials['email']);
+                    })
+                    ->when(isset($credentials['phone_number']), function ($q) use ($credentials) {
+                        return $q->orWhere('phone_number', $credentials['phone_number']);
+                    })
+                    ->first();
 
-        if (!$user || !Hash::check($credentials['password'], $user->password)) {
-            throw ValidationException::withMessages(['email' => 'Invalid credentials.']);
+        if (!$user || (isset($credentials['password']) && !Hash::check($credentials['password'], $user->password))) {
+            throw ValidationException::withMessages(['login' => 'Invalid credentials.']);
         }
 
         if (!$user->hasVerifiedEmail()) {
@@ -70,6 +84,56 @@ class AuthService
         $user->notify(new TestLoginPushNotification());
         return [
             'access_token' => $token,
+            'token_type' => 'Bearer',
+            'user' => $user->load('roles', 'permissions'),
+        ];
+    }
+
+    /**
+     * Social Login (Google, Apple, etc.)
+     */
+    public function socialLogin(array $data): array
+    {
+        $provider = $data['provider'];
+        $token = $data['token']; // Social provider token sent from mobile app/frontend
+
+        try {
+            $socialUser = Socialite::driver($provider)->stateless()->userFromToken($token);
+        } catch (\Exception $e) {
+            throw ValidationException::withMessages(['token' => 'Invalid or expired social token.']);
+        }
+
+        $user = User::where('email', $socialUser->getEmail())->first();
+
+        if (!$user) {
+            $user = User::create([
+                'name' => $socialUser->getName() ?? 'User',
+                'email' => $socialUser->getEmail(),
+                'password' => Hash::make(Str::random(24)),
+                'provider_name' => $provider,
+                'provider_id' => $socialUser->getId(),
+                'email_verified_at' => Carbon::now(),
+                'avatar' => $socialUser->getAvatar(),
+            ]);
+            $user->assignRole('user');
+        } else {
+            if (!$user->provider_name) {
+                $user->update([
+                    'provider_name' => $provider,
+                    'provider_id' => $socialUser->getId(),
+                    'email_verified_at' => $user->email_verified_at ?? Carbon::now(),
+                ]);
+            }
+        }
+
+        if (isset($data['fcm_token'])) {
+            $this->registerFcmToken($user, $data['fcm_token']);
+        }
+
+        $authToken = $user->createToken('auth_token')->plainTextToken;
+
+        return [
+            'access_token' => $authToken,
             'token_type' => 'Bearer',
             'user' => $user->load('roles', 'permissions'),
         ];

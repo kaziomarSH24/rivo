@@ -16,7 +16,7 @@ return [
 
     // Text to place in the "Introduction" section, right after the `description`. Markdown and HTML are supported.
     'intro_text' => <<<INTRO
-**Welcome to the Boilerplate API.**
+**Welcome to the Rivo API.**
 
 This backend covers: **Authentication**, **Profile**, **Roles & Permissions**, **Realtime Chat**, **Stripe One‑time & Subscription Billing**, **Invoices & Refunds**, **Payment Methods**, **Activity Log**, and **File Uploads**.
 

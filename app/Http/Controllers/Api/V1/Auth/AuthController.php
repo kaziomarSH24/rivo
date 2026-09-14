@@ -11,7 +11,7 @@ use Illuminate\Validation\ValidationException;
 /**
  * @group Authentication
  * Endpoints for user registration, login and logout.
- * @unauthenticated register login
+ * @unauthenticated register login socialLogin
  */
 class AuthController extends Controller
 {
@@ -30,9 +30,32 @@ class AuthController extends Controller
 
     public function login(Request $request)
     {
+        $request->validate([
+            'email' => 'required_without:phone_number|nullable|string|email',
+            'phone_number' => 'required_without:email|nullable|string',
+            'password' => 'required|string',
+            'fcm_token' => 'nullable|string'
+        ]);
+
         try {
-            $data = $this->authService->login($request->only('email', 'password', 'fcm_token'));
+            $data = $this->authService->login($request->only('email', 'phone_number', 'password', 'fcm_token'));
             return response_success('Login successful', $data);
+        } catch (ValidationException $e) {
+            return response_error($e->getMessage(), $e->errors(), 401);
+        }
+    }
+
+    public function socialLogin(Request $request)
+    {
+        $request->validate([
+            'provider' => 'required|in:google,apple',
+            'token' => 'required|string',
+            'fcm_token' => 'nullable|string'
+        ]);
+
+        try {
+            $data = $this->authService->socialLogin($request->only('provider', 'token', 'fcm_token'));
+            return response_success('Social Login successful', $data);
         } catch (ValidationException $e) {
             return response_error($e->getMessage(), $e->errors(), 401);
         }

@@ -17,7 +17,10 @@ class RegisterRequest extends BaseRequest
     {
         return [
             'name' => 'required|string|max:255',
-            'email' => 'required|string|email|max:255|unique:users',
+            'email' => 'required_without:phone_number|nullable|string|email|max:255|unique:users',
+            'phone_number' => 'required_without:email|nullable|string|max:20|unique:users',
+            'country_code' => 'nullable|string|max:5',
+            'user_type' => 'nullable|string',
             'password' => 'required|string|min:8|confirmed',
             'fcm_token' => 'sometimes|string|nullable',
         ];

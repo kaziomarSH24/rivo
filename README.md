@@ -1,4 +1,4 @@
-<h1 align="center">🚀 Laravel 12 Boilerplate</h1>
+<h1 align="center">🚀 Laravel 12 Rivo</h1>
 <p align="center">
 Production-ready Laravel backend with Authentication, Roles & Permissions, Activity Log, Real-time Chat (Reverb), Stripe Billing, Queues, Scheduler, Redis, Firebase FCM, and Clean Architecture.
 </p>
@@ -100,14 +100,14 @@ Edit `.env` and configure the following (minimum required):
 
 ```env
 # App
-APP_NAME="Laravel Boilerplate"
+APP_NAME="Laravel Rivo"
 APP_ENV=local
 APP_DEBUG=true
 APP_URL=http://localhost
 
 # Database
 DB_CONNECTION=mysql
-DB_HOST=boilerplate-db
+DB_HOST=rivo-db
 DB_PORT=3306
 DB_DATABASE=laravel
 DB_USERNAME=laravel_user
@@ -115,7 +115,7 @@ DB_PASSWORD=secret_password
 MYSQL_ROOT_PASSWORD=root_password
 
 # Redis
-REDIS_HOST=boilerplate-redis
+REDIS_HOST=rivo-redis
 REDIS_PASSWORD=null
 REDIS_PORT=6379
 
@@ -123,7 +123,7 @@ REDIS_PORT=6379
 REVERB_APP_ID=app-id
 REVERB_APP_KEY=local-app-key
 REVERB_APP_SECRET=app-secret
-REVERB_HOST=boilerplate-reverb
+REVERB_HOST=rivo-reverb
 REVERB_PORT=8080
 REVERB_SCHEME=http
 
@@ -143,17 +143,17 @@ When you first clone this repository, the `vendor` folder doesn't exist (it's in
 **Solution:** Run Composer install BEFORE starting the full stack:
 
 ```bash
-docker compose run --rm --entrypoint "" boilerplate-app composer install
+docker compose run --rm --entrypoint "" rivo-app composer install
 ```
 
-> **Note:** Replace `boilerplate-app` with your actual service name if you've changed it in `docker-compose.yml`
+> **Note:** Replace `rivo-app` with your actual service name if you've changed it in `docker-compose.yml`
 
 **What this does:**
 
 -   `run` - Executes a one-time command in a new container
 -   `--rm` - Automatically removes the container after execution
 -   `--entrypoint ""` - Bypasses the default entrypoint script
--   `boilerplate-app` - The service name from docker-compose.yml
+-   `rivo-app` - The service name from docker-compose.yml
 -   `composer install` - Installs all PHP dependencies into the `vendor` folder
 
 #### Step 3: Start the Docker Environment
@@ -181,13 +181,13 @@ This will start:
 Generate application key:
 
 ```bash
-docker compose exec boilerplate-app php artisan key:generate
+docker compose exec rivo-app php artisan key:generate
 ```
 
 Run database migrations and seeders:
 
 ```bash
-docker compose exec boilerplate-app php artisan migrate --seed
+docker compose exec rivo-app php artisan migrate --seed
 ```
 
 #### Step 5: Access Your Application
@@ -221,7 +221,7 @@ docker compose down
 docker compose logs -f
 
 # Specific service
-docker compose logs -f boilerplate-app
+docker compose logs -f rivo-app
 docker compose logs -f queue-worker
 docker compose logs -f scheduler
 ```
@@ -229,23 +229,23 @@ docker compose logs -f scheduler
 ### Running Artisan Commands
 
 ```bash
-docker compose exec boilerplate-app php artisan [command]
+docker compose exec rivo-app php artisan [command]
 ```
 
 Examples:
 
 ```bash
 # Clear cache
-docker compose exec boilerplate-app php artisan cache:clear
+docker compose exec rivo-app php artisan cache:clear
 
 # Create a new controller
-docker compose exec boilerplate-app php artisan make:controller ApiController
+docker compose exec rivo-app php artisan make:controller ApiController
 
 # Run migrations
-docker compose exec boilerplate-app php artisan migrate
+docker compose exec rivo-app php artisan migrate
 
 # Create a new migration
-docker compose exec boilerplate-app php artisan make:migration create_posts_table
+docker compose exec rivo-app php artisan make:migration create_posts_table
 ```
 
 ### Installing New Packages
@@ -253,25 +253,25 @@ docker compose exec boilerplate-app php artisan make:migration create_posts_tabl
 **PHP packages:**
 
 ```bash
-docker compose exec boilerplate-app composer require vendor/package
+docker compose exec rivo-app composer require vendor/package
 ```
 
 **After pulling new code with updated dependencies:**
 
 ```bash
-docker compose exec boilerplate-app composer install
+docker compose exec rivo-app composer install
 ```
 
 **Node packages:**
 
 ```bash
-docker compose exec boilerplate-node npm install package-name
+docker compose exec rivo-node npm install package-name
 ```
 
 ### Running Tests
 
 ```bash
-docker compose exec boilerplate-app php artisan test
+docker compose exec rivo-app php artisan test
 ```
 
 ---
@@ -280,7 +280,7 @@ docker compose exec boilerplate-app php artisan test
 
 ### Using Docker Compose in Production
 
-This boilerplate uses a single `docker-compose.yml` file with an optional `docker-compose.override.yml` for development-specific configurations.
+This rivo uses a single `docker-compose.yml` file with an optional `docker-compose.override.yml` for development-specific configurations.
 
 **In Development:**
 
@@ -300,14 +300,14 @@ This boilerplate uses a single `docker-compose.yml` file with an optional `docke
 1. **Build the production image:**
 
 ```bash
-docker build -t my-boilerplate-app:latest -f backend/Dockerfile backend/
+docker build -t my-rivo-app:latest -f backend/Dockerfile backend/
 ```
 
 2. **Push to registry (optional):**
 
 ```bash
-docker tag my-boilerplate-app:latest registry.example.com/my-boilerplate-app:latest
-docker push registry.example.com/my-boilerplate-app:latest
+docker tag my-rivo-app:latest registry.example.com/my-rivo-app:latest
+docker push registry.example.com/my-rivo-app:latest
 ```
 
 3. **On production server:**
@@ -328,7 +328,7 @@ docker compose pull
 docker compose up -d
 
 # Run migrations (first time or after updates)
-docker compose exec boilerplate-app php artisan migrate --force
+docker compose exec rivo-app php artisan migrate --force
 ```
 
 4. **SSL Certificate Setup:**
@@ -357,7 +357,7 @@ APP_URL=https://yourdomain.com
 APP_KEY=base64:...
 
 # Production database
-DB_HOST=boilerplate-db
+DB_HOST=rivo-db
 DB_DATABASE=production_db
 DB_USERNAME=prod_user
 DB_PASSWORD=strong_random_password
@@ -948,19 +948,19 @@ class GlobalSearchFilter implements Filter
 
 ```bash
 # Run all tests
-docker compose exec boilerplate-app php artisan test
+docker compose exec rivo-app php artisan test
 
 # Run specific test file
-docker compose exec boilerplate-app php artisan test tests/Feature/AuthTest.php
+docker compose exec rivo-app php artisan test tests/Feature/AuthTest.php
 
 # Run with coverage
-docker compose exec boilerplate-app php artisan test --coverage
+docker compose exec rivo-app php artisan test --coverage
 ```
 
 ### Generate API Documentation
 
 ```bash
-docker compose exec boilerplate-app php artisan scribe:generate
+docker compose exec rivo-app php artisan scribe:generate
 ```
 
 Documentation will be available at `/docs`
@@ -976,7 +976,7 @@ Documentation will be available at `/docs`
 | Duplicate payment method skipped | Same card fingerprint       | Expected (dedup logic)                                                         |
 | Subscription missing             | Webhook not processed       | Ensure queue worker running                                                    |
 | Reverb connection fails          | Port or CORS misconfig      | Expose REVERB_PORT & adjust JS client                                          |
-| vendor folder missing            | First time clone            | Run `docker compose run --rm --entrypoint "" boilerplate-app composer install` |
+| vendor folder missing            | First time clone            | Run `docker compose run --rm --entrypoint "" rivo-app composer install` |
 
 ---
 
@@ -993,7 +993,7 @@ Documentation will be available at `/docs`
 
 ## 📜 License
 
-MIT License - Feel free to use this boilerplate for personal or commercial projects.
+MIT License - Feel free to use this rivo for personal or commercial projects.
 
 ---
 
@@ -1010,7 +1010,7 @@ Contributions are welcome! Please:
 
 ## ✅ Summary
 
-This boilerplate provides everything you need to quickly build and deploy a production-ready SaaS application:
+This rivo provides everything you need to quickly build and deploy a production-ready SaaS application:
 
 ✅ Complete authentication & authorization  
 ✅ Real-time chat with WebSockets  

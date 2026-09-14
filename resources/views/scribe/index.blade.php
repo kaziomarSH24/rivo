@@ -4,7 +4,7 @@
     <meta charset="utf-8">
     <meta content="IE=edge,chrome=1" http-equiv="X-UA-Compatible">
     <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
-    <title>Boilerplate API Documentation</title>
+    <title>Rivo API Documentation</title>
 
     <link href="https://fonts.googleapis.com/css?family=Open+Sans&display=swap" rel="stylesheet">
 
@@ -325,7 +325,7 @@ Access Stripe-hosted customer billing portal.</a>
 <aside>
     <strong>Base URL</strong>: <code>http://localhost:81</code>
 </aside>
-<p><strong>Welcome to the Boilerplate API.</strong></p>
+<p><strong>Welcome to the Rivo API.</strong></p>
 <p>This backend covers: <strong>Authentication</strong>, <strong>Profile</strong>, <strong>Roles &amp; Permissions</strong>, <strong>Realtime Chat</strong>, <strong>Stripe One‑time &amp; Subscription Billing</strong>, <strong>Invoices &amp; Refunds</strong>, <strong>Payment Methods</strong>, <strong>Activity Log</strong>, and <strong>File Uploads</strong>.</p>
 <h3 id="auth-quick-start">Auth Quick Start</h3>
 <ol>

@@ -27,6 +27,7 @@ use App\Http\Controllers\Api\V1\Payment\SubscriptionController;
 Route::prefix('v1/auth')->group(function () {
     Route::post('/register', [AuthController::class, 'register'])->name('api.v1.auth.register');
     Route::post('/login', [AuthController::class, 'login'])->name('api.v1.auth.login');
+    Route::post('/social-login', [AuthController::class, 'socialLogin'])->name('api.v1.auth.socialLogin');
 
     Route::post('/verify', [VerificationController::class, 'verify'])->name('api.v1.auth.verify');
     Route::post('/resend-verification', [VerificationController::class, 'resendVerification'])->name('api.v1.auth.resendVerification');

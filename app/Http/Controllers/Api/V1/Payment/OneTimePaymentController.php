@@ -3,7 +3,7 @@
 namespace App\Http\Controllers\Api\V1\Payment;
 
 use App\Http\Controllers\Controller;
-// Only the User model is imported, as the Order model does not exist in this boilerplate
+// Only the User model is imported, as the Order model does not exist in this rivo
 use App\Models\User;
 use Exception;
 use Illuminate\Http\Request;
