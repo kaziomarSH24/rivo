@@ -34,39 +34,45 @@ class WalkController extends Controller
             $query->where('pet_id', $pet->id);
         });
 
-        return response_success('Walk history retrieved', WalkSessionResource::collection($walks)->response()->getData(true));
+        return WalkSessionResource::collection($walks);
     }
 
     /**
-     * Complete a new walk
+     * Complete a walk session
      */
     public function store(StoreWalkSessionRequest $request, Pet $pet)
     {
         Gate::authorize('view', $pet);
 
-        $result = $this->walkService->endWalk($pet->id, $request->validated());
+        $data = $request->validated();
+        $result = $this->walkService->endWalk($pet->id, $data);
 
         return response_success('Walk completed successfully', [
             'walk' => new WalkSessionResource($result['walk']),
             'level_up' => $result['level_up'],
+            'streak_updated' => $result['streak_updated'],
             'bonus_xp' => $result['bonus_xp'],
-            'new_reward' => $result['new_reward'],
         ], 201);
     }
 
     /**
-     * Get single walk details
+     * Show a specific walk session
      */
-    public function show(WalkSession $walk, Request $request)
+    public function show(Pet $pet, WalkSession $walk)
     {
-        $walk->load(['pet']);
-        Gate::authorize('view', $walk->pet);
+        Gate::authorize('view', $pet);
+        
+        if ($walk->pet_id !== $pet->id) {
+            return response_error('Walk session does not belong to this pet', 403);
+        }
 
-        return response_success('Walk details retrieved', new WalkSessionResource($walk));
+        $walk->load(['pet', 'route']);
+
+        return response_success('Walk session retrieved', new WalkSessionResource($walk));
     }
 
     /**
-     * Get Pet Walk Statistics & Heatmap
+     * Get Pet Walk Statistics
      */
     public function statistics(Pet $pet, Request $request)
     {
@@ -90,9 +96,9 @@ class WalkController extends Controller
     }
 
     /**
-     * Get current goals and stats
+     * Get Pet Walk Goals and Streak
      */
-    public function getStats(Pet $pet, Request $request)
+    public function stats(Pet $pet)
     {
         Gate::authorize('view', $pet);
 
@@ -111,29 +117,32 @@ class WalkController extends Controller
     }
 
     /**
-     * Get Rewards Status
+     * Get unlocked and locked rewards for a pet
      */
-    public function rewards(Pet $pet, Request $request)
+    public function rewards(Pet $pet)
     {
         Gate::authorize('view', $pet);
 
-        $rewards = WalkReward::orderBy('level')->get();
         $stat = $pet->walkStats()->first();
-        $currentLevel = $stat ? $stat->current_level : 0;
+        $currentStreak = $stat ? $stat->current_streak_days : 0;
 
-        $data = $rewards->map(function ($r) use ($currentLevel) {
-            return [
-                'level' => $r->level,
-                'required_streak_days' => $r->required_streak_days,
-                'bonus_xp' => $r->bonus_xp,
-                'reward_title' => $r->reward_title,
-                'is_unlocked' => $currentLevel >= $r->level
-            ];
+        $rewards = WalkReward::orderBy('required_streak_days', 'asc')->get();
+        
+        $formattedRewards = $rewards->map(function ($reward) use ($currentStreak) {
+            $resource = new WalkRewardResource($reward);
+            $resource->setCurrentStreak($currentStreak);
+            return $resource;
         });
 
-        return response_success('Rewards retrieved', $data);
+        return response_success('Rewards retrieved', $formattedRewards);
+    }
+
+    public function routesTab(Pet $pet, Request $request)
+    {
+        Gate::authorize('view', $pet);
+        
+        $insights = $this->walkService->getRoutesTabInsights($pet->id, $request->user()->id);
+        
+        return response_success('Routes tab data retrieved', $insights);
     }
 }
-
-
-

@@ -58,6 +58,7 @@ Route::middleware('auth:sanctum', 'throttle:api')->prefix('v1')->group(function 
         Route::get('walks', [WalkController::class, 'index']);
         Route::post('walks', [WalkController::class, 'store']);
         Route::get('walk-statistics', [WalkController::class, 'statistics']);
+                Route::get('walk-routes-tab', [WalkController::class, 'routesTab']);
         Route::get('walk-stats', [WalkController::class, 'getStats']);
         Route::get('walk-rewards', [WalkController::class, 'rewards']);
     });
@@ -159,3 +160,4 @@ Route::middleware('auth:sanctum', 'throttle:api')->prefix('v1')->group(function 
         return response_error('The requested API endpoint does not exist.', [], 404);
     });
 });
+

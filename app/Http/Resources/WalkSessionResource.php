@@ -23,6 +23,7 @@ class WalkSessionResource extends JsonResource
             'route_coordinates' => $this->route_coordinates,
             'xp_earned' => $this->xp_earned,
             'route' => new WalkRouteResource($this->whenLoaded('route')),
+            'pet' => new PetResource($this->whenLoaded('pet')),
             'created_at' => $this->created_at,
         ];
     }
