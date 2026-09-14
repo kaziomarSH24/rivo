@@ -10,6 +10,8 @@ use App\Http\Controllers\Api\V1\Chat\GroupController;
 use App\Http\Controllers\Api\V1\Chat\MessageController;
 use App\Http\Controllers\Api\V1\NotificationController;
 use App\Http\Controllers\Api\V1\PetController;
+use App\Http\Controllers\Api\V1\WalkController;
+use App\Http\Controllers\Api\V1\WalkRouteController;
 use App\Http\Controllers\Api\V1\Payment\InvoiceController;
 use App\Http\Controllers\Api\V1\Payment\OneTimePaymentController;
 use App\Http\Controllers\Api\V1\Payment\PaymentMethodController;
@@ -50,6 +52,19 @@ Route::middleware('auth:sanctum', 'throttle:api')->prefix('v1')->group(function 
     });
 
     Route::apiResource('pets', PetController::class);
+
+    // Walk APIs
+    Route::prefix('pets/{pet}')->group(function () {
+        Route::get('walks', [WalkController::class, 'index']);
+        Route::post('walks', [WalkController::class, 'store']);
+        Route::get('walk-statistics', [WalkController::class, 'statistics']);
+        Route::get('walk-stats', [WalkController::class, 'getStats']);
+        Route::get('walk-rewards', [WalkController::class, 'rewards']);
+    });
+    Route::get('walks/{walk}', [WalkController::class, 'show']);
+
+    Route::apiResource('walk-routes', WalkRouteController::class)->except(['update', 'show']);
+    Route::put('walk-routes/{walk_route}/toggle-favorite', [WalkRouteController::class, 'toggleFavorite']);
 
     // Profile related protected routes
     Route::prefix('profile')->name('api.v1.profile.')->group(function () {

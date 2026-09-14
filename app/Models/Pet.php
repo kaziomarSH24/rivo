@@ -27,4 +27,14 @@ class Pet extends Model
     {
         return $this->belongsTo(User::class);
     }
+
+    public function walkStats()
+    {
+        return $this->hasOne(PetWalkStat::class);
+    }
+
+    public function walkSessions()
+    {
+        return $this->hasMany(WalkSession::class);
+    }
 }

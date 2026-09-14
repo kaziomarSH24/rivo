@@ -9,6 +9,7 @@ use App\Http\Resources\PetResource;
 use App\Models\Pet;
 use App\Services\PetService;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Gate;
 
 /**
  * @group Pet Management
@@ -83,3 +84,6 @@ class PetController extends Controller
         return response_success('Pet deleted successfully');
     }
 }
+
+
+

@@ -22,11 +22,6 @@ class User extends Authenticatable
 
     use AutoClearsCache; // Magic Starts Here!
 
-    // Optional: If updating a user should clear their posts cache too
-    // public function getRelatedCacheTags(): array
-    // {
-    //     return ['posts'];
-    // }
     /**
      * The attributes that are mass assignable.
      *
@@ -84,6 +79,11 @@ class User extends Authenticatable
     public function pets(): HasMany
     {
         return $this->hasMany(Pet::class);
+    }
+
+    public function walkRoutes()
+    {
+        return $this->hasMany(WalkRoute::class);
     }
 
     // Activity Log Configuration, it's also customizable
