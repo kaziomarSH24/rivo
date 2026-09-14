@@ -13,13 +13,14 @@ use Laravel\Sanctum\HasApiTokens;
 use Laravel\Cashier\Billable;
 use Spatie\Activitylog\Traits\LogsActivity;
 use Spatie\Activitylog\LogOptions;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class User extends Authenticatable
 {
     /** @use HasFactory<\Database\Factories\UserFactory> */
     use HasFactory, Notifiable, HasRoles, HasApiTokens, Billable, LogsActivity;
 
-    // use AutoClearsCache; // Magic Starts Here!
+    use AutoClearsCache; // Magic Starts Here!
 
     // Optional: If updating a user should clear their posts cache too
     // public function getRelatedCacheTags(): array
@@ -78,6 +79,11 @@ class User extends Authenticatable
     public function fcmTokens()
     {
         return $this->hasMany(FcmToken::class);
+    }
+
+    public function pets(): HasMany
+    {
+        return $this->hasMany(Pet::class);
     }
 
     // Activity Log Configuration, it's also customizable

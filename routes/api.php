@@ -9,6 +9,7 @@ use App\Http\Controllers\Api\V1\Chat\ConversationController;
 use App\Http\Controllers\Api\V1\Chat\GroupController;
 use App\Http\Controllers\Api\V1\Chat\MessageController;
 use App\Http\Controllers\Api\V1\NotificationController;
+use App\Http\Controllers\Api\V1\PetController;
 use App\Http\Controllers\Api\V1\Payment\InvoiceController;
 use App\Http\Controllers\Api\V1\Payment\OneTimePaymentController;
 use App\Http\Controllers\Api\V1\Payment\PaymentMethodController;
@@ -47,6 +48,8 @@ Route::middleware('auth:sanctum', 'throttle:api')->prefix('v1')->group(function 
         Route::post('/logout', [AuthController::class, 'logout'])->name('logout');
         Route::post('/update-password', [PasswordController::class, 'updatePassword'])->name('updatePassword');
     });
+
+    Route::apiResource('pets', PetController::class);
 
     // Profile related protected routes
     Route::prefix('profile')->name('api.v1.profile.')->group(function () {

@@ -32,7 +32,7 @@ class AuthService
             'email' => $data['email'] ?? null,
             'phone_number' => $data['phone_number'] ?? null,
             'country_code' => $data['country_code'] ?? null,
-            'password' => Hash::make($data['password'] ?? Str::random(10)),
+            'password' => Hash::make($data['password']),
             'otp' => $otp,
             'verification_token' => $token,
             'otp_expires_at' => Carbon::now()->addMinutes(10),
