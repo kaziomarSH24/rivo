@@ -1,6 +1,10 @@
 <?php
 
-namespace App\Http\Resources;
+namespace App\Http\Resources\Pet;
+
+
+
+use App\Http\Resources\UserResource;
 
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
@@ -26,3 +30,6 @@ class PetResource extends JsonResource
         ];
     }
 }
+
+
+

@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Services;
+namespace App\Services\User;
 
 use App\Filters\GlobalSearchFilter;
 use App\Services\BaseService;
@@ -65,3 +65,5 @@ class UserService extends BaseService
 
 
 }
+
+

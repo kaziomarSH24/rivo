@@ -1,6 +1,10 @@
 <?php
 
-namespace App\Services;
+namespace App\Services\Pet;
+
+
+
+use App\Services\BaseService;
 
 use App\Models\Pet;
 use App\Models\User;
@@ -68,3 +72,6 @@ class PetService extends BaseService
         return $this->delete($pet->id);
     }
 }
+
+
+

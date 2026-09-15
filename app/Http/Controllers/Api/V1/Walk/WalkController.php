@@ -1,16 +1,16 @@
 <?php
 
-namespace App\Http\Controllers\Api\V1;
+namespace App\Http\Controllers\Api\V1\Walk;
 
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Walk\StoreWalkSessionRequest;
-use App\Http\Resources\WalkSessionResource;
-use App\Http\Resources\PetWalkStatResource;
-use App\Http\Resources\WalkRewardResource;
+use App\Http\Resources\Walk\WalkSessionResource;
+use App\Http\Resources\Walk\PetWalkStatResource;
+use App\Http\Resources\Walk\WalkRewardResource;
 use App\Models\Pet;
 use App\Models\WalkSession;
 use App\Models\WalkReward;
-use App\Services\WalkService;
+use App\Services\Walk\WalkService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Gate;
 
@@ -146,3 +146,6 @@ class WalkController extends Controller
         return response_success('Routes tab data retrieved', $insights);
     }
 }
+
+
+

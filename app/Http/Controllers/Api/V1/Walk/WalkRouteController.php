@@ -1,12 +1,12 @@
 <?php
 
-namespace App\Http\Controllers\Api\V1;
+namespace App\Http\Controllers\Api\V1\Walk;
 
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Walk\StoreWalkRouteRequest;
-use App\Http\Resources\WalkRouteResource;
+use App\Http\Resources\Walk\WalkRouteResource;
 use App\Models\WalkRoute;
-use App\Services\WalkRouteService;
+use App\Services\Walk\WalkRouteService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Gate;
 
@@ -66,6 +66,9 @@ class WalkRouteController extends Controller
         return response_success('Route updated', new WalkRouteResource($updated));
     }
 }
+
+
+
 
 
 

@@ -3,7 +3,7 @@
 namespace App\Http\Controllers\Api\V1\Auth;
 
 use App\Http\Controllers\Controller;
-use App\Services\AuthService;
+use App\Services\Auth\AuthService;
 use Illuminate\Http\Request;
 
 /**
@@ -49,3 +49,6 @@ class VerificationController extends Controller
         }
     }
 }
+
+
+

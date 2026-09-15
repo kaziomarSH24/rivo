@@ -8,10 +8,10 @@ use App\Http\Controllers\Api\V1\Auth\VerificationController;
 use App\Http\Controllers\Api\V1\Chat\ConversationController;
 use App\Http\Controllers\Api\V1\Chat\GroupController;
 use App\Http\Controllers\Api\V1\Chat\MessageController;
-use App\Http\Controllers\Api\V1\NotificationController;
-use App\Http\Controllers\Api\V1\PetController;
-use App\Http\Controllers\Api\V1\WalkController;
-use App\Http\Controllers\Api\V1\WalkRouteController;
+use App\Http\Controllers\Api\V1\Notification\NotificationController;
+use App\Http\Controllers\Api\V1\Pet\PetController;
+use App\Http\Controllers\Api\V1\Walk\WalkController;
+use App\Http\Controllers\Api\V1\Walk\WalkRouteController;
 use App\Http\Controllers\Api\V1\Payment\InvoiceController;
 use App\Http\Controllers\Api\V1\Payment\OneTimePaymentController;
 use App\Http\Controllers\Api\V1\Payment\PaymentMethodController;
@@ -161,8 +161,23 @@ Route::middleware('auth:sanctum', 'throttle:api')->prefix('v1')->group(function 
     });
 
         // Emergency Contacts
-        Route::apiResource('emergency-contacts', App\Http\Controllers\Api\V1\EmergencyContactController::class)->except(['show']);
+        Route::apiResource('emergency-contacts', App\Http\Controllers\Api\V1\EmergencyContact\EmergencyContactController::class)->except(['show']);
+    
+        // AI
+        Route::get('ai/appointment-insights', [App\Http\Controllers\Api\V1\Ai\AiController::class, 'appointmentInsights']);
+
+        // Appointments
+        Route::apiResource('appointments', App\Http\Controllers\Api\V1\Appointment\AppointmentController::class)->except(['show']);
+        Route::patch('appointments/{appointment}/status', [App\Http\Controllers\Api\V1\Appointment\AppointmentController::class, 'updateStatus']);
+        Route::get('appointments/{appointment}/notes', [App\Http\Controllers\Api\V1\Appointment\AppointmentController::class, 'getNotes']);
+        Route::post('appointments/{appointment}/notes', [App\Http\Controllers\Api\V1\Appointment\AppointmentController::class, 'storeNote']);
     });
+
+
+
+
+
+
 
 
 

@@ -1,6 +1,10 @@
 <?php
 
-namespace App\Http\Resources;
+namespace App\Http\Resources\Walk;
+
+
+
+use App\Http\Resources\Pet\PetResource;
 
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
@@ -28,3 +32,6 @@ class WalkSessionResource extends JsonResource
         ];
     }
 }
+
+
+

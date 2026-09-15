@@ -1,6 +1,10 @@
 <?php
 
-namespace App\Services;
+namespace App\Services\Walk;
+
+
+
+use App\Services\BaseService;
 
 use App\Models\WalkSession;
 use App\Models\PetWalkStat;
@@ -288,3 +292,6 @@ class WalkService extends BaseService
         ];
     }
 }
+
+
+

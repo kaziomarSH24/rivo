@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Http\Controllers\Api\V1;
+namespace App\Http\Controllers\Api\V1\Notification;
 
 use App\Http\Controllers\Controller;
 use App\Http\Resources\NotificationResource;
@@ -51,3 +51,5 @@ class NotificationController extends Controller
         return response_success('Notification deleted successfully.');
     }
 }
+
+

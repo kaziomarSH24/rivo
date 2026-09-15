@@ -34,3 +34,5 @@ class CallbackController extends Controller
         return response('<h1>Payment Cancelled</h1><p>Your payment process was cancelled. You have not been charged.</p>');
     }
 }
+
+

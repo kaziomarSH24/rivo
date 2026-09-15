@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Services;
+namespace App\Services\Auth;
 
 use App\Models\User;
 use Carbon\Carbon;
@@ -313,3 +313,5 @@ class AuthService
         return $user;
     }
 }
+
+

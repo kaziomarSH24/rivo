@@ -4,7 +4,7 @@ namespace App\Http\Controllers\Api\V1\Auth;
 
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Auth\UpdateProfileRequest;
-use App\Services\AuthService;
+use App\Services\Auth\AuthService;
 use Illuminate\Http\Request;
 use Illuminate\Validation\ValidationException;
 
@@ -37,3 +37,6 @@ class ProfileController extends Controller
         }
     }
 }
+
+
+

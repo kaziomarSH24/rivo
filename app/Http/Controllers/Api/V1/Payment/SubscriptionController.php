@@ -109,3 +109,5 @@ class SubscriptionController extends Controller
         return response_error('You are already on this plan or no active subscription found.', [], 422);
     }
 }
+
+

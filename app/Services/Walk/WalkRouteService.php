@@ -1,8 +1,12 @@
 <?php
 
-namespace App\Services;
+namespace App\Services\Walk;
 
+
+
+use App\Services\BaseService;
 use App\Models\WalkRoute;
+
 
 class WalkRouteService extends BaseService
 {
@@ -29,4 +33,8 @@ class WalkRouteService extends BaseService
         return $route;
     }
 }
+
+
+
+
 

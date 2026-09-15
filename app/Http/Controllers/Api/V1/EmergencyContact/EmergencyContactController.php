@@ -1,11 +1,11 @@
 <?php
 
-namespace App\Http\Controllers\Api\V1;
+namespace App\Http\Controllers\Api\V1\EmergencyContact;
 
 use App\Http\Controllers\Controller;
 use App\Http\Requests\EmergencyContact\StoreEmergencyContactRequest;
 use App\Http\Requests\EmergencyContact\UpdateEmergencyContactRequest;
-use App\Http\Resources\EmergencyContactResource;
+use App\Http\Resources\EmergencyContact\EmergencyContactResource;
 use App\Models\EmergencyContact;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Gate;
@@ -58,3 +58,6 @@ class EmergencyContactController extends Controller
         return response_success('Emergency contact removed successfully', null);
     }
 }
+
+
+

@@ -1,13 +1,13 @@
 <?php
 
-namespace App\Http\Controllers\Api\V1;
+namespace App\Http\Controllers\Api\V1\Pet;
 
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Pet\StorePetRequest;
 use App\Http\Requests\Pet\UpdatePetRequest;
-use App\Http\Resources\PetResource;
+use App\Http\Resources\Pet\PetResource;
 use App\Models\Pet;
-use App\Services\PetService;
+use App\Services\Pet\PetService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Gate;
 
@@ -84,6 +84,9 @@ class PetController extends Controller
         return response_success('Pet deleted successfully');
     }
 }
+
+
+
 
 
 
