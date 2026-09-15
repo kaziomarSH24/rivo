@@ -30,6 +30,10 @@ return Application::configure(basePath: dirname(__DIR__))
         }
     )
     ->withMiddleware(function (Middleware $middleware) {
+        $middleware->alias([
+            'pro' => \App\Http\Middleware\CheckProSubscription::class,
+        ]);
+
         $middleware->redirectGuestsTo(function (Request $request) {
             if ($request->is('api/*') || $request->expectsJson()) {
                 return null;
@@ -80,3 +84,5 @@ return Application::configure(basePath: dirname(__DIR__))
             }
         });
     })->create();
+
+

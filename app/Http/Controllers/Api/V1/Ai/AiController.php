@@ -33,7 +33,32 @@ class AiController extends Controller
             'insight_text' => trim($insight)
         ]);
     }
+
+    /**
+     * Pro Feature: Chat with RivoCare AI
+     */
+    public function chat(Request $request)
+    {
+        $prompt = $request->input('prompt');
+        
+        if (empty($prompt)) {
+            return response()->json(['ok' => false, 'message' => 'Prompt is required'], 400);
+        }
+
+        // Just calling a raw prompt on the AI service to test it
+        // In real implementation, we would maintain conversation history
+        $response = $this->aiService->getAppointmentInsights(collect([])); // Temporary placeholder since we don't have a direct raw prompt method yet
+        
+        return response()->json([
+            'ok' => true,
+            'message' => 'Chat response generated successfully',
+            'data' => [
+                'response' => "RivoCare AI says: I received your message about '{$prompt}'. I am a Pro feature!"
+            ]
+        ]);
+    }
 }
+
 
 
 

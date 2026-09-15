@@ -18,6 +18,9 @@ class AppointmentService extends BaseService
             'status',
             'type',
             'vet_name',
+            \Spatie\QueryBuilder\AllowedFilter::callback('date', function (\Illuminate\Database\Eloquent\Builder $query, $value) {
+                $query->whereDate('datetime', \Carbon\Carbon::parse($value)->toDateString());
+            }),
         ];
     }
 
@@ -38,6 +41,7 @@ class AppointmentService extends BaseService
         ];
     }
 }
+
 
 
 

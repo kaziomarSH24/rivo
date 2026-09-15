@@ -6,6 +6,7 @@ namespace App\Models;
 
 use App\Traits\AutoClearsCache;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Spatie\Permission\Traits\HasRoles;
@@ -42,6 +43,9 @@ class User extends Authenticatable
         'provider_name',
         'provider_id',
         'avatar',
+        'plan_id',
+        'revenuecat_app_user_id',
+        'subscription_expires_at',
     ];
 
     /**
@@ -105,4 +109,10 @@ class User extends Authenticatable
     {
         return $this->hasMany(Appointment::class);
     }
+
+    public function plan(): BelongsTo
+    {
+        return $this->belongsTo(Plan::class);
+    }
 }
+

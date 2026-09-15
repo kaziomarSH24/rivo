@@ -17,66 +17,93 @@ use App\Http\Controllers\Api\V1\Payment\OneTimePaymentController;
 use App\Http\Controllers\Api\V1\Payment\PaymentMethodController;
 use App\Http\Controllers\Api\V1\Payment\RefundController;
 use App\Http\Controllers\Api\V1\Payment\StripePortalController;
-use App\Http\Controllers\Api\V1\Payment\SubscriptionController;
+use App\Http\Controllers\Api\V1\Payment\SubscriptionController as StripeSubscriptionController;
+use App\Http\Controllers\Api\V1\SubscriptionController;
+use App\Http\Controllers\Api\V1\Webhook\RevenueCatWebhookController;
+use App\Http\Controllers\Api\V1\Ai\AiController;
+use App\Http\Controllers\Api\V1\EmergencyContact\EmergencyContactController;
+use App\Http\Controllers\Api\V1\Appointment\AppointmentController;
 
+// ==========================================
+// PUBLIC ROUTES
+// ==========================================
 
-
-// Route::post(
-//     '/v1/stripe/webhook',
-//     [WebhookController::class, 'handleWebhook']
-// )->name('cashier.webhook');
-
-// --- Public Routes (Authentication) ---
-Route::prefix('v1/auth')->group(function () {
-    Route::post('/register', [AuthController::class, 'register'])->name('api.v1.auth.register');
-    Route::post('/login', [AuthController::class, 'login'])->name('api.v1.auth.login');
-    Route::post('/social-login', [AuthController::class, 'socialLogin'])->name('api.v1.auth.socialLogin');
-
-    Route::post('/verify', [VerificationController::class, 'verify'])->name('api.v1.auth.verify');
-    Route::post('/resend-verification', [VerificationController::class, 'resendVerification'])->name('api.v1.auth.resendVerification');
-
-    Route::post('/forgot-password', [PasswordController::class, 'forgotPassword'])->name('api.v1.auth.forgotPassword');
-    Route::post('/verify-password-otp', [PasswordController::class, 'verifyResetOtp'])->name('api.v1.auth.verifyResetOtp');
-    Route::post('/reset-password-with-token', [PasswordController::class, 'resetPasswordWithToken'])->name('api.v1.auth.resetPasswordWithToken');
+// Auth Routes
+Route::prefix('v1/auth')->name('api.v1.auth.')->group(function () {
+    Route::post('/register', [AuthController::class, 'register'])->name('register');
+    Route::post('/login', [AuthController::class, 'login'])->name('login');
+    Route::post('/social-login', [AuthController::class, 'socialLogin'])->name('socialLogin');
+    Route::post('/verify', [VerificationController::class, 'verify'])->name('verify');
+    Route::post('/resend-verification', [VerificationController::class, 'resendVerification'])->name('resendVerification');
+    Route::post('/forgot-password', [PasswordController::class, 'forgotPassword'])->name('forgotPassword');
+    Route::post('/verify-password-otp', [PasswordController::class, 'verifyResetOtp'])->name('verifyResetOtp');
+    Route::post('/reset-password-with-token', [PasswordController::class, 'resetPasswordWithToken'])->name('resetPasswordWithToken');
 });
 
-// Route::post('/upload', [FileController::class, 'handleRequest'])->name('api.v1.file.upload');
+// Webhooks
+Route::post('v1/webhooks/revenuecat', [RevenueCatWebhookController::class, 'handle']);
 
-// --- Protected Routes (User must be logged in) ---
-Route::middleware('auth:sanctum', 'throttle:api')->prefix('v1')->group(function () {
 
-    // Auth related protected routes
-    Route::prefix('auth')->name('api.v1.auth.')->group(function () {
+// ==========================================
+// PROTECTED ROUTES (Requires Authentication)
+// ==========================================
+Route::middleware(['auth:sanctum', 'throttle:api'])->prefix('v1')->name('api.v1.')->group(function () {
+
+    // --- User & Profile ---
+    Route::prefix('auth')->name('auth.')->group(function () {
         Route::post('/logout', [AuthController::class, 'logout'])->name('logout');
         Route::post('/update-password', [PasswordController::class, 'updatePassword'])->name('updatePassword');
     });
 
-    Route::apiResource('pets', PetController::class);
-
-    // Walk APIs
-    Route::prefix('pets/{pet}')->group(function () {
-        Route::get('walks', [WalkController::class, 'index']);
-        Route::post('walks', [WalkController::class, 'store']);
-        Route::get('walk-statistics', [WalkController::class, 'statistics']);
-                Route::get('walk-routes-tab', [WalkController::class, 'routesTab']);
-        Route::get('walk-stats', [WalkController::class, 'getStats']);
-        Route::get('walk-rewards', [WalkController::class, 'rewards']);
-    });
-    Route::get('walks/{walk}', [WalkController::class, 'show']);
-
-    Route::apiResource('walk-routes', WalkRouteController::class)->except(['update', 'show']);
-    Route::put('walk-routes/{walk_route}/toggle-favorite', [WalkRouteController::class, 'toggleFavorite']);
-
-    // Profile related protected routes
-    Route::prefix('profile')->name('api.v1.profile.')->group(function () {
+    Route::prefix('profile')->name('profile.')->group(function () {
         Route::get('/me', [ProfileController::class, 'me'])->name('me');
         Route::post('/update', [ProfileController::class, 'updateProfile'])->name('update');
     });
 
-    /**
-     ** Chat Module Routes
-     */
-    Route::prefix('chat')->name('api.v1.chat.')->group(function () {
+    // --- Core Features ---
+    Route::apiResource('pets', PetController::class);
+    
+    // Appointments
+    Route::apiResource('appointments', AppointmentController::class)->except(['show']);
+    Route::patch('appointments/{appointment}/status', [AppointmentController::class, 'updateStatus']);
+    Route::get('appointments/{appointment}/notes', [AppointmentController::class, 'getNotes']);
+    Route::post('appointments/{appointment}/notes', [AppointmentController::class, 'storeNote']);
+
+    // Emergency Contacts
+    Route::apiResource('emergency-contacts', EmergencyContactController::class)->except(['show']);
+
+    // --- Walks Module ---
+    Route::prefix('pets/{pet}')->group(function () {
+        Route::get('walks', [WalkController::class, 'index']);
+        Route::post('walks', [WalkController::class, 'store']);
+        Route::get('walk-statistics', [WalkController::class, 'statistics']);
+        Route::get('walk-routes-tab', [WalkController::class, 'routesTab']);
+        Route::get('walk-stats', [WalkController::class, 'getStats']);
+        Route::get('walk-rewards', [WalkController::class, 'rewards']);
+    });
+    Route::get('walks/{walk}', [WalkController::class, 'show']);
+    
+    Route::apiResource('walk-routes', WalkRouteController::class)->except(['update', 'show']);
+    Route::put('walk-routes/{walk_route}/toggle-favorite', [WalkRouteController::class, 'toggleFavorite']);
+
+    // --- RivoCare AI ---
+    Route::prefix('ai')->name('ai.')->group(function () {
+        Route::get('appointment-insights', [AiController::class, 'appointmentInsights']);
+        
+        // Pro Features
+        Route::middleware('pro')->group(function () {
+            Route::post('chat', [AiController::class, 'chat']);
+        });
+    });
+
+    // --- Subscriptions (Mobile IAP) ---
+    Route::prefix('subscriptions')->name('subscriptions.')->group(function () {
+        Route::get('plans', [SubscriptionController::class, 'getPlans']);
+        Route::get('status', [SubscriptionController::class, 'getStatus']);
+    });
+
+    // --- Chat Module ---
+    Route::prefix('chat')->name('chat.')->group(function () {
         // Conversations
         Route::get('/conversations', [ConversationController::class, 'index'])->name('conversations.index');
         Route::post('/conversations', [ConversationController::class, 'store'])->name('conversations.store');
@@ -99,56 +126,40 @@ Route::middleware('auth:sanctum', 'throttle:api')->prefix('v1')->group(function 
         Route::post('/conversations/{conversation}/typing', [MessageController::class, 'typing'])->name('typing');
     });
 
-
-    //**---Payment Method routes---**//
-    Route::prefix('payment')->name('api.v1.payment.')->group(function () {
-
-        // One-time payment routes
+    // --- Payments (Stripe Boilerplate) ---
+    Route::prefix('payment')->name('payment.')->group(function () {
         Route::prefix('one-time')->name('one-time.')->group(function () {
             Route::post('/checkout-session', [OneTimePaymentController::class, 'createCheckoutSession'])->name('checkout-session');
             Route::post('/payment-intent', [OneTimePaymentController::class, 'createPaymentIntent'])->name('payment-intent');
         });
-
-        // Subscription routes
-        Route::prefix('subscriptions')->name('subscriptions.')->group(function () {
-            Route::post('/', [SubscriptionController::class, 'createSubscription'])->name('create');
-            Route::get('/', [SubscriptionController::class, 'showSubscription'])->name('show');
-            Route::post('/cancel', [SubscriptionController::class, 'cancelSubscription'])->name('cancel');
-            Route::post('/resume', [SubscriptionController::class, 'resumeSubscription'])->name('resume');
-            Route::post('/swap', [SubscriptionController::class, 'swapPlan'])->name('swap');
+        Route::prefix('subscriptions')->name('stripe-subscriptions.')->group(function () {
+            Route::post('/', [StripeSubscriptionController::class, 'createSubscription'])->name('create');
+            Route::get('/', [StripeSubscriptionController::class, 'showSubscription'])->name('show');
+            Route::post('/cancel', [StripeSubscriptionController::class, 'cancelSubscription'])->name('cancel');
+            Route::post('/resume', [StripeSubscriptionController::class, 'resumeSubscription'])->name('resume');
+            Route::post('/swap', [StripeSubscriptionController::class, 'swapPlan'])->name('swap');
         });
-
-        // Refund routes
         Route::prefix('refunds')->name('refunds.')->group(function () {
             Route::post('/', [RefundController::class, 'requestRefund'])->name('request');
         });
-
-        // Invoice routes
         Route::prefix('invoices')->name('invoices.')->group(function () {
             Route::get('/', [InvoiceController::class, 'index'])->name('index');
             Route::get('/{invoice}/download', [InvoiceController::class, 'download'])->name('download');
         });
-
-        // Payment method routes
         Route::prefix('payment-methods')->name('payment-methods.')->group(function () {
             Route::get('/', [PaymentMethodController::class, 'index'])->name('index');
             Route::post('/', [PaymentMethodController::class, 'store'])->name('store');
             Route::patch('/{paymentMethod}/set-default', [PaymentMethodController::class, 'setDefault'])->name('set-default');
             Route::delete('/{paymentMethod}', [PaymentMethodController::class, 'destroy'])->name('destroy');
             Route::delete('/', [PaymentMethodController::class, 'destroyAll'])->name('destroy-all');
-            //createSetupIntent
             Route::post('/setup-intent', [PaymentMethodController::class, 'createSetupIntent'])->name('setup-intent');
-            //createSetupSession for save card
             Route::post('/setup-session', [PaymentMethodController::class, 'createSetupSession'])->name('setup-session');
         });
-
-        // Stripe billing portal route
         Route::post('/billing-portal', [StripePortalController::class, 'redirectToPortal'])->name('billing-portal');
     });
 
-
-    //***--- Notification Routes ---***/
-    Route::prefix('notifications')->name('api.v1.notifications.')->group(function () {
+    // --- Notifications ---
+    Route::prefix('notifications')->name('notifications.')->group(function () {
         Route::get('/', [NotificationController::class, 'index'])->name('index');
         Route::get('/stats', [NotificationController::class, 'stats'])->name('stats');
         Route::post('/{notification}/mark-as-read', [NotificationController::class, 'markAsRead'])->name('mark-as-read');
@@ -156,30 +167,11 @@ Route::middleware('auth:sanctum', 'throttle:api')->prefix('v1')->group(function 
         Route::delete('/{notification}', [NotificationController::class, 'destroy'])->name('destroy');
     });
 
-    Route::fallback(function () {
-        return response_error('The requested API endpoint does not exist.', [], 404);
-    });
+});
 
-        // Emergency Contacts
-        Route::apiResource('emergency-contacts', App\Http\Controllers\Api\V1\EmergencyContact\EmergencyContactController::class)->except(['show']);
-    
-        // AI
-        Route::get('ai/appointment-insights', [App\Http\Controllers\Api\V1\Ai\AiController::class, 'appointmentInsights']);
-
-        // Appointments
-        Route::apiResource('appointments', App\Http\Controllers\Api\V1\Appointment\AppointmentController::class)->except(['show']);
-        Route::patch('appointments/{appointment}/status', [App\Http\Controllers\Api\V1\Appointment\AppointmentController::class, 'updateStatus']);
-        Route::get('appointments/{appointment}/notes', [App\Http\Controllers\Api\V1\Appointment\AppointmentController::class, 'getNotes']);
-        Route::post('appointments/{appointment}/notes', [App\Http\Controllers\Api\V1\Appointment\AppointmentController::class, 'storeNote']);
-    });
-
-
-
-
-
-
-
-
-
-
-
+// ==========================================
+// FALLBACK ROUTE (Must be at the end)
+// ==========================================
+Route::fallback(function () {
+    return response_error('The requested API endpoint does not exist.', [], 404);
+});

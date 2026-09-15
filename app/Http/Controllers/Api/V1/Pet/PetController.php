@@ -42,7 +42,26 @@ class PetController extends Controller
      */
     public function store(StorePetRequest $request)
     {
-        $pet = $this->petService->createPet($request->validated(), $request->user(), $request);
+        $user = $request->user();
+        $petCount = $user->pets()->count();
+        $planId = $user->plan_id ?: 1; // Default to free plan if null
+        
+        $maxPets = match ($planId) {
+            1 => 1,
+            2 => 2,
+            3 => 3,
+            default => 1,
+        };
+
+        if ($petCount >= $maxPets) {
+            return response_error(
+                "You have reached the maximum number of pets ({$maxPets}) allowed for your current plan. Please upgrade to add more pets.", 
+                [], 
+                403
+            );
+        }
+
+        $pet = $this->petService->createPet($request->validated(), $user, $request);
         return response_success('Pet added successfully', new PetResource($pet), 201);
     }
 
@@ -84,6 +103,7 @@ class PetController extends Controller
         return response_success('Pet deleted successfully');
     }
 }
+
 
 
 
