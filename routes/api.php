@@ -159,5 +159,12 @@ Route::middleware('auth:sanctum', 'throttle:api')->prefix('v1')->group(function 
     Route::fallback(function () {
         return response_error('The requested API endpoint does not exist.', [], 404);
     });
-});
+
+        // Emergency Contacts
+        Route::apiResource('emergency-contacts', App\Http\Controllers\Api\V1\EmergencyContactController::class)->except(['show']);
+    });
+
+
+
+
 

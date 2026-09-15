@@ -95,4 +95,9 @@ class User extends Authenticatable
             ->setDescriptionForEvent(fn(string $eventName) => "User has been {$eventName}")
             ->useLogName('user_activity');
     }
+
+    public function emergencyContacts(): HasMany
+    {
+        return $this->hasMany(EmergencyContact::class);
+    }
 }
