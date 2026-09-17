@@ -62,6 +62,18 @@ Route::middleware(['auth:sanctum', 'throttle:api'])->prefix('v1')->name('api.v1.
 
     // --- Core Features ---
     Route::apiResource('pets', PetController::class);
+
+    // --- Care Module ---
+    Route::apiResource('pets.care-tasks', App\Http\Controllers\Api\V1\Pet\CareController::class)->only(['index', 'store']);
+    Route::post('pets/{pet}/care-tasks/{careTask}/complete', [App\Http\Controllers\Api\V1\Pet\CareController::class, 'complete']);
+
+    // --- Health Vault Module ---
+    Route::get('pets/{pet}/health-vault/dashboard', [App\Http\Controllers\Api\V1\Pet\HealthVaultController::class, 'getDashboard']);
+    Route::get('pets/{pet}/health-vault/documents', [App\Http\Controllers\Api\V1\Pet\HealthVaultController::class, 'getDocuments']);
+    Route::post('pets/{pet}/health-vault/documents', [App\Http\Controllers\Api\V1\Pet\HealthVaultController::class, 'uploadDocument']);
+    Route::delete('pets/{pet}/health-vault/documents/{document}', [App\Http\Controllers\Api\V1\Pet\HealthVaultController::class, 'deleteDocument']);
+    Route::get('pets/{pet}/health-vault/weight', [App\Http\Controllers\Api\V1\Pet\HealthVaultController::class, 'getWeightLogs']);
+    Route::post('pets/{pet}/health-vault/weight', [App\Http\Controllers\Api\V1\Pet\HealthVaultController::class, 'logWeight']);
     
     // Appointments
     Route::apiResource('appointments', AppointmentController::class)->except(['show']);
@@ -175,3 +187,6 @@ Route::middleware(['auth:sanctum', 'throttle:api'])->prefix('v1')->name('api.v1.
 Route::fallback(function () {
     return response_error('The requested API endpoint does not exist.', [], 404);
 });
+
+
+

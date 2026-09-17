@@ -82,7 +82,22 @@ class RivoAiService
     protected function getSystemInstruction($topic, $petContext)
     {
         $base = "You are RivoCare AI, a smart pet health assistant within the Rivo app. ";
-        $petInfo = $petContext ? "The user is asking about their pet: {$petContext->name} (Type: {$petContext->type}, Breed: {$petContext->breed}, Age: {$petContext->age_years}y {$petContext->age_months}m, Weight: {$petContext->weight}kg). " : "";
+        $petInfo = "";
+        
+        if ($petContext) {
+            $petInfo = "The user is asking about their pet: {$petContext->name} (Type: {$petContext->type}, Breed: {$petContext->breed}, Age: {$petContext->age_years}y {$petContext->age_months}m, Weight: {$petContext->weight}kg). ";
+            
+            try {
+                $vaultService = app(\App\Services\Pet\HealthVaultService::class);
+                $healthData = $vaultService->getDashboard($petContext);
+                $healthScore = $healthData['health_score']['score'] ?? 0;
+                $healthStatus = $healthData['health_score']['status'] ?? 'Unknown';
+                
+                $petInfo .= "Current Health Score: {$healthScore}/100 (Status: {$healthStatus}). ";
+            } catch (\Exception $e) {
+                // Ignore if fails
+            }
+        }
 
         $strictDisclaimer = "STRICT INSTRUCTION: You MUST ONLY answer questions related to your specific role described below. If the user asks about ANYTHING else (like politics, programming, general knowledge, or topics outside your role), politely decline and say you are only here to help with your assigned topic. ";
 
@@ -171,6 +186,7 @@ class RivoAiService
         }
     }
 }
+
 
 
 

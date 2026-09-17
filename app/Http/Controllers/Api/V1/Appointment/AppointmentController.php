@@ -35,6 +35,16 @@ class AppointmentController extends Controller
             if ($request->has('date')) {
                 $query->whereDate('datetime', $request->date);
             }
+            
+            // Add pet filter if requested
+            if ($request->has('pet_id')) {
+                $query->where('pet_id', $request->pet_id);
+            }
+            
+            // Add type filter if requested
+            if ($request->has('type')) {
+                $query->where('type', $request->type);
+            }
         });
 
         // Calculate stats
@@ -101,6 +111,7 @@ class AppointmentController extends Controller
         return response_success('Notes retrieved', AppointmentNoteResource::collection($notes));
     }
 }
+
 
 
 
