@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api\V1\Ai;
 
 use App\Http\Controllers\Controller;
 use App\Models\Appointment;
+use App\Models\Pet;
 use App\Services\Ai\RivoAiService;
 use Illuminate\Http\Request;
 
@@ -39,25 +40,37 @@ class AiController extends Controller
      */
     public function chat(Request $request)
     {
+        $request->validate([
+            'topic' => 'required|string|in:symptom,nutrition,training,general',
+            'prompt' => 'required|string|max:1000',
+            'history' => 'nullable|array',
+            'history.*.role' => 'required_with:history|string|in:user,model',
+            'history.*.parts' => 'required_with:history|string',
+            'pet_id' => 'nullable|exists:pets,id'
+        ]);
+
+        $topic = $request->input('topic');
         $prompt = $request->input('prompt');
+        $history = $request->input('history', []);
         
-        if (empty($prompt)) {
-            return response()->json(['ok' => false, 'message' => 'Prompt is required'], 400);
+        $petContext = null;
+        if ($request->has('pet_id')) {
+            $petContext = Pet::where('user_id', $request->user()->id)
+                ->find($request->input('pet_id'));
         }
 
-        // Just calling a raw prompt on the AI service to test it
-        // In real implementation, we would maintain conversation history
-        $response = $this->aiService->getAppointmentInsights(collect([])); // Temporary placeholder since we don't have a direct raw prompt method yet
+        $aiResponse = $this->aiService->generateChatResponse($topic, $prompt, $history, $petContext);
         
         return response()->json([
             'ok' => true,
             'message' => 'Chat response generated successfully',
             'data' => [
-                'response' => "RivoCare AI says: I received your message about '{$prompt}'. I am a Pro feature!"
+                'response' => $aiResponse
             ]
         ]);
     }
 }
+
 
 
 
