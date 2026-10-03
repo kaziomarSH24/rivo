@@ -32,4 +32,23 @@ class LostPetReport extends Model
     {
         return $this->belongsTo(User::class);
     }
+
+    public function posts()
+    {
+        return $this->morphMany(Post::class, 'postable');
+    }
+
+    /**
+     * Get the full URL for the last seen photo.
+     */
+    public function getLastSeenPhotoUrlAttribute(): ?string
+    {
+        if ($this->last_seen_photo) {
+            return url(\Illuminate\Support\Facades\Storage::url($this->last_seen_photo));
+        }
+
+        return null;
+    }
 }
+
+

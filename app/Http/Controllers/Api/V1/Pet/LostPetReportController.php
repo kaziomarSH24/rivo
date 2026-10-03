@@ -5,12 +5,12 @@ namespace App\Http\Controllers\Api\V1\Pet;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\StoreLostPetReportRequest;
 use App\Http\Resources\LostPetReportResource;
-use App\Models\LostPetReport;
 use App\Models\Pet;
 use App\Services\Pet\LostPetReportService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Gate;
-
+use App\Http\Requests\StoreCommunityPostRequest;
+use App\Http\Resources\PostResource;
 class LostPetReportController extends Controller
 {
     protected LostPetReportService $lostPetReportService;
@@ -44,10 +44,13 @@ class LostPetReportController extends Controller
         Gate::authorize('update', $pet);
 
         try {
+            $data = $request->validated();
+            $data['user_id'] = $request->user()->id;
+            
             $report = $this->lostPetReportService->createReport(
                 $pet, 
-                $request->validated() + ['user_id' => $request->user()->id],
-                $request->file('last_seen_photo')
+                $data,
+                $request
             );
             return response_success('Lost mode activated successfully. Poster created.', new LostPetReportResource($report), 201);
         } catch (\Exception $e) {
@@ -58,6 +61,22 @@ class LostPetReportController extends Controller
     /**
      * Mark pet as found (Toggle Lost Mode OFF)
      */
+    /**
+     * Publish the active lost report to the community social feed
+     */
+    public function postToCommunity(StoreCommunityPostRequest $request, Pet $pet)
+    {
+        Gate::authorize('update', $pet);
+
+        try {
+            $post = $this->lostPetReportService->postToCommunity($pet, $request->validated(), $request->user());
+            $post->load('postable'); // Load the morph relation for the response
+            return response_success('Lost pet poster published to community feed successfully.', new PostResource($post), 201);
+        } catch (\Exception $e) {
+            return response_error($e->getMessage(), [], 400);
+        }
+    }
+
     public function markAsFound(Pet $pet, Request $request)
     {
         Gate::authorize('update', $pet);
@@ -89,3 +108,10 @@ class LostPetReportController extends Controller
         );
     }
 }
+
+
+
+
+
+
+

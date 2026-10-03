@@ -4,6 +4,8 @@ namespace App\Http\Resources;
 
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
+use App\Http\Resources\Pet\PetResource;
+use Illuminate\Support\Facades\Storage;
 
 class LostPetReportResource extends JsonResource
 {
@@ -19,7 +21,7 @@ class LostPetReportResource extends JsonResource
             'longitude' => (float) $this->longitude,
             'additional_info' => $this->additional_info,
             'reward_amount' => $this->reward_amount ? (float) $this->reward_amount : null,
-            'last_seen_photo_url' => $this->last_seen_photo ? url($this->last_seen_photo) : null,
+            'last_seen_photo_url' => $this->last_seen_photo_url,
             'created_at' => $this->created_at,
             'pet' => new PetResource($this->whenLoaded('pet')),
             'user' => [
@@ -30,3 +32,6 @@ class LostPetReportResource extends JsonResource
         ];
     }
 }
+
+
+

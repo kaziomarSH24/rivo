@@ -1,5 +1,8 @@
 <?php
 
+use App\Http\Controllers\Api\V1\Pet\CareController;
+use App\Http\Controllers\Api\V1\Pet\HealthVaultController;
+use App\Http\Controllers\Api\V1\Pet\LostPetReportController;
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\Api\V1\Auth\AuthController;
 use App\Http\Controllers\Api\V1\Auth\PasswordController;
@@ -29,15 +32,23 @@ use App\Http\Controllers\Api\V1\Appointment\AppointmentController;
 // ==========================================
 
 // Auth Routes
-Route::prefix('v1/auth')->name('api.v1.auth.')->group(function () {
-    Route::post('/register', [AuthController::class, 'register'])->name('register');
-    Route::post('/login', [AuthController::class, 'login'])->name('login');
-    Route::post('/social-login', [AuthController::class, 'socialLogin'])->name('socialLogin');
-    Route::post('/verify', [VerificationController::class, 'verify'])->name('verify');
-    Route::post('/resend-verification', [VerificationController::class, 'resendVerification'])->name('resendVerification');
-    Route::post('/forgot-password', [PasswordController::class, 'forgotPassword'])->name('forgotPassword');
-    Route::post('/verify-password-otp', [PasswordController::class, 'verifyResetOtp'])->name('verifyResetOtp');
-    Route::post('/reset-password-with-token', [PasswordController::class, 'resetPasswordWithToken'])->name('resetPasswordWithToken');
+Route::prefix('v1/auth')->name('api.v1.auth.')->controller(AuthController::class)->group(function () {
+    Route::post('/register', 'register')->name('register');
+    Route::post('/login', 'login')->name('login');
+    Route::post('/social-login', 'socialLogin')->name('socialLogin');
+    Route::post('/logout', 'logout')->name('logout')->middleware('auth:sanctum');
+});
+
+Route::prefix('v1/auth')->name('api.v1.auth.')->controller(VerificationController::class)->group(function () {
+    Route::post('/verify', 'verify')->name('verify');
+    Route::post('/resend-verification', 'resendVerification')->name('resendVerification');
+});
+
+Route::prefix('v1/auth')->name('api.v1.auth.')->controller(PasswordController::class)->group(function () {
+    Route::post('/forgot-password', 'forgotPassword')->name('forgotPassword');
+    Route::post('/verify-password-otp', 'verifyResetOtp')->name('verifyResetOtp');
+    Route::post('/reset-password-with-token', 'resetPasswordWithToken')->name('resetPasswordWithToken');
+    Route::post('/update-password', 'updatePassword')->name('updatePassword')->middleware('auth:sanctum');
 });
 
 // Webhooks
@@ -49,49 +60,47 @@ Route::post('v1/webhooks/revenuecat', [RevenueCatWebhookController::class, 'hand
 // ==========================================
 Route::middleware(['auth:sanctum', 'throttle:api'])->prefix('v1')->name('api.v1.')->group(function () {
 
-    // --- User & Profile ---
-    Route::prefix('auth')->name('auth.')->group(function () {
-        Route::post('/logout', [AuthController::class, 'logout'])->name('logout');
-        Route::post('/update-password', [PasswordController::class, 'updatePassword'])->name('updatePassword');
-    });
-
-    Route::prefix('profile')->name('profile.')->group(function () {
-        Route::get('/me', [ProfileController::class, 'me'])->name('me');
-        Route::post('/update', [ProfileController::class, 'updateProfile'])->name('update');
+    Route::prefix('profile')->name('profile.')->controller(ProfileController::class)->group(function () {
+        Route::get('/me', 'me')->name('me');
+        Route::post('/update', 'updateProfile')->name('update');
     });
 
     // --- Core Features ---
     Route::apiResource('pets', PetController::class);
 
     // --- Care Module ---
-    Route::apiResource('pets.care-tasks', App\Http\Controllers\Api\V1\Pet\CareController::class)->only(['index', 'store']);
-    Route::post('pets/{pet}/care-tasks/{careTask}/complete', [App\Http\Controllers\Api\V1\Pet\CareController::class, 'complete']);
+    Route::apiResource('pets.care-tasks', CareController::class)->only(['index', 'store']);
+    Route::post('pets/{pet}/care-tasks/{careTask}/complete', [CareController::class, 'complete']);
 
     // --- Health Vault Module ---
-    Route::get('pets/{pet}/health-vault/dashboard', [App\Http\Controllers\Api\V1\Pet\HealthVaultController::class, 'getDashboard']);
-    Route::get('pets/{pet}/health-vault/documents', [App\Http\Controllers\Api\V1\Pet\HealthVaultController::class, 'getDocuments']);
-    Route::post('pets/{pet}/health-vault/documents', [App\Http\Controllers\Api\V1\Pet\HealthVaultController::class, 'uploadDocument']);
-    Route::delete('pets/{pet}/health-vault/documents/{document}', [App\Http\Controllers\Api\V1\Pet\HealthVaultController::class, 'deleteDocument']);
-    Route::get('pets/{pet}/health-vault/weight', [App\Http\Controllers\Api\V1\Pet\HealthVaultController::class, 'getWeightLogs']);
-    Route::post('pets/{pet}/health-vault/weight', [App\Http\Controllers\Api\V1\Pet\HealthVaultController::class, 'logWeight']);
+    Route::controller(HealthVaultController::class)->prefix('pets/{pet}/health-vault')->group(function () {
+        Route::get('dashboard', 'getDashboard');
+        Route::get('documents', 'getDocuments');
+        Route::post('documents', 'uploadDocument');
+        Route::delete('documents/{document}', 'deleteDocument');
+        Route::get('weight', 'getWeightLogs');
+        Route::post('weight', 'logWeight');
+    });
     
-    // Appointments
+    // --- Appointments ---
     Route::apiResource('appointments', AppointmentController::class)->except(['show']);
-    Route::patch('appointments/{appointment}/status', [AppointmentController::class, 'updateStatus']);
-    Route::get('appointments/{appointment}/notes', [AppointmentController::class, 'getNotes']);
-    Route::post('appointments/{appointment}/notes', [AppointmentController::class, 'storeNote']);
+    Route::controller(AppointmentController::class)->prefix('appointments/{appointment}')->group(function () {
+        Route::patch('status', 'updateStatus');
+        Route::get('notes', 'getNotes');
+        Route::post('notes', 'storeNote');
+    });
 
-    // Emergency Contacts
+    // --- Emergency Contacts ---
     Route::apiResource('emergency-contacts', EmergencyContactController::class)->except(['show']);
 
     // --- Walks Module ---
-    Route::prefix('pets/{pet}')->group(function () {
-        Route::get('walks', [WalkController::class, 'index']);
-        Route::post('walks', [WalkController::class, 'store']);
-        Route::get('walk-statistics', [WalkController::class, 'statistics']);
-        Route::get('walk-routes-tab', [WalkController::class, 'routesTab']);
-        Route::get('walk-stats', [WalkController::class, 'getStats']);
-        Route::get('walk-rewards', [WalkController::class, 'rewards']);
+    Route::controller(WalkController::class)->prefix('pets/{pet}')->group(function () {
+        Route::get('walks', 'index');
+        Route::post('walks', 'store');
+        Route::get('walk-statistics', 'statistics');
+        Route::get('walk-routes-tab', 'routesTab');
+        Route::get('walk-stats', 'getStats');
+        Route::get('walk-rewards', 'rewards');
     });
     Route::get('walks/{walk}', [WalkController::class, 'show']);
     
@@ -99,86 +108,99 @@ Route::middleware(['auth:sanctum', 'throttle:api'])->prefix('v1')->name('api.v1.
     Route::put('walk-routes/{walk_route}/toggle-favorite', [WalkRouteController::class, 'toggleFavorite']);
 
     // --- RivoCare AI ---
-    Route::prefix('ai')->name('ai.')->group(function () {
-        Route::get('appointment-insights', [AiController::class, 'appointmentInsights']);
-        
-        // Pro Features
-        Route::middleware('pro')->group(function () {
-            Route::post('chat', [AiController::class, 'chat']);
-        });
+    Route::controller(AiController::class)->prefix('ai')->name('ai.')->group(function () {
+        Route::get('appointment-insights', 'appointmentInsights');
+        Route::middleware('pro')->post('chat', 'chat');
     });
 
     // --- Subscriptions (Mobile IAP) ---
-    Route::prefix('subscriptions')->name('subscriptions.')->group(function () {
-        Route::get('plans', [SubscriptionController::class, 'getPlans']);
-        Route::get('status', [SubscriptionController::class, 'getStatus']);
+    Route::controller(SubscriptionController::class)->prefix('subscriptions')->name('subscriptions.')->group(function () {
+        Route::get('plans', 'getPlans');
+        Route::get('status', 'getStatus');
     });
 
     // --- Chat Module ---
     Route::prefix('chat')->name('chat.')->group(function () {
-        // Conversations
-        Route::get('/conversations', [ConversationController::class, 'index'])->name('conversations.index');
-        Route::post('/conversations', [ConversationController::class, 'store'])->name('conversations.store');
+        Route::controller(ConversationController::class)->prefix('conversations')->group(function () {
+            Route::get('/', 'index')->name('conversations.index');
+            Route::post('/', 'store')->name('conversations.store');
+        });
 
-        // Messages
-        Route::get('/conversations/{conversation}/messages', [MessageController::class, 'index'])->name('messages.index');
-        Route::post('/messages', [MessageController::class, 'store'])->name('messages.store');
-        Route::patch('/messages/{message}', [MessageController::class, 'update'])->name('messages.update');
-        Route::delete('/messages/{message}', [MessageController::class, 'destroy'])->name('messages.destroy');
-        Route::post('/messages/read', [MessageController::class, 'markAsRead'])->name('messages.read');
+        Route::controller(MessageController::class)->group(function () {
+            Route::get('conversations/{conversation}/messages', 'index')->name('messages.index');
+            Route::post('messages', 'store')->name('messages.store');
+            Route::patch('messages/{message}', 'update')->name('messages.update');
+            Route::delete('messages/{message}', 'destroy')->name('messages.destroy');
+            Route::post('messages/read', 'markAsRead')->name('messages.read');
+            Route::post('conversations/{conversation}/typing', 'typing')->name('typing');
+        });
 
-        // Group Management
-        Route::post('/groups/{conversation}/members', [GroupController::class, 'addMember'])->name('groups.members.add');
-        Route::delete('/groups/{conversation}/members', [GroupController::class, 'removeMember'])->name('groups.members.remove');
-        Route::post('/groups/{conversation}/leave', [GroupController::class, 'leaveGroup'])->name('groups.leave');
-        Route::post('/groups/{conversation}/promote', [GroupController::class, 'promoteToAdmin'])->name('groups.promote');
-        Route::post('/groups/{conversation}/demote', [GroupController::class, 'demoteToMember'])->name('groups.demote');
-
-        // Real-time
-        Route::post('/conversations/{conversation}/typing', [MessageController::class, 'typing'])->name('typing');
+        Route::controller(GroupController::class)->prefix('groups/{conversation}')->name('groups.')->group(function () {
+            Route::post('members', 'addMember')->name('members.add');
+            Route::delete('members', 'removeMember')->name('members.remove');
+            Route::post('leave', 'leaveGroup')->name('leave');
+            Route::post('promote', 'promoteToAdmin')->name('promote');
+            Route::post('demote', 'demoteToMember')->name('demote');
+        });
     });
 
     // --- Payments (Stripe Boilerplate) ---
     Route::prefix('payment')->name('payment.')->group(function () {
-        Route::prefix('one-time')->name('one-time.')->group(function () {
-            Route::post('/checkout-session', [OneTimePaymentController::class, 'createCheckoutSession'])->name('checkout-session');
-            Route::post('/payment-intent', [OneTimePaymentController::class, 'createPaymentIntent'])->name('payment-intent');
+        Route::controller(OneTimePaymentController::class)->prefix('one-time')->name('one-time.')->group(function () {
+            Route::post('/checkout-session', 'createCheckoutSession')->name('checkout-session');
+            Route::post('/payment-intent', 'createPaymentIntent')->name('payment-intent');
         });
-        Route::prefix('subscriptions')->name('stripe-subscriptions.')->group(function () {
-            Route::post('/', [StripeSubscriptionController::class, 'createSubscription'])->name('create');
-            Route::get('/', [StripeSubscriptionController::class, 'showSubscription'])->name('show');
-            Route::post('/cancel', [StripeSubscriptionController::class, 'cancelSubscription'])->name('cancel');
-            Route::post('/resume', [StripeSubscriptionController::class, 'resumeSubscription'])->name('resume');
-            Route::post('/swap', [StripeSubscriptionController::class, 'swapPlan'])->name('swap');
+        
+        Route::controller(StripeSubscriptionController::class)->prefix('subscriptions')->name('stripe-subscriptions.')->group(function () {
+            Route::post('/', 'createSubscription')->name('create');
+            Route::get('/', 'showSubscription')->name('show');
+            Route::post('/cancel', 'cancelSubscription')->name('cancel');
+            Route::post('/resume', 'resumeSubscription')->name('resume');
+            Route::post('/swap', 'swapPlan')->name('swap');
         });
-        Route::prefix('refunds')->name('refunds.')->group(function () {
-            Route::post('/', [RefundController::class, 'requestRefund'])->name('request');
+        
+        Route::post('refunds', [RefundController::class, 'requestRefund'])->name('refunds.request');
+        
+        Route::controller(InvoiceController::class)->prefix('invoices')->name('invoices.')->group(function () {
+            Route::get('/', 'index')->name('index');
+            Route::get('/{invoice}/download', 'download')->name('download');
         });
-        Route::prefix('invoices')->name('invoices.')->group(function () {
-            Route::get('/', [InvoiceController::class, 'index'])->name('index');
-            Route::get('/{invoice}/download', [InvoiceController::class, 'download'])->name('download');
+        
+        Route::controller(PaymentMethodController::class)->prefix('payment-methods')->name('payment-methods.')->group(function () {
+            Route::get('/', 'index')->name('index');
+            Route::post('/', 'store')->name('store');
+            Route::patch('/{paymentMethod}/set-default', 'setDefault')->name('set-default');
+            Route::delete('/{paymentMethod}', 'destroy')->name('destroy');
+            Route::delete('/', 'destroyAll')->name('destroy-all');
+            Route::post('/setup-intent', 'createSetupIntent')->name('setup-intent');
+            Route::post('/setup-session', 'createSetupSession')->name('setup-session');
         });
-        Route::prefix('payment-methods')->name('payment-methods.')->group(function () {
-            Route::get('/', [PaymentMethodController::class, 'index'])->name('index');
-            Route::post('/', [PaymentMethodController::class, 'store'])->name('store');
-            Route::patch('/{paymentMethod}/set-default', [PaymentMethodController::class, 'setDefault'])->name('set-default');
-            Route::delete('/{paymentMethod}', [PaymentMethodController::class, 'destroy'])->name('destroy');
-            Route::delete('/', [PaymentMethodController::class, 'destroyAll'])->name('destroy-all');
-            Route::post('/setup-intent', [PaymentMethodController::class, 'createSetupIntent'])->name('setup-intent');
-            Route::post('/setup-session', [PaymentMethodController::class, 'createSetupSession'])->name('setup-session');
-        });
+        
         Route::post('/billing-portal', [StripePortalController::class, 'redirectToPortal'])->name('billing-portal');
     });
 
     // --- Notifications ---
-    Route::prefix('notifications')->name('notifications.')->group(function () {
-        Route::get('/', [NotificationController::class, 'index'])->name('index');
-        Route::get('/stats', [NotificationController::class, 'stats'])->name('stats');
-        Route::post('/{notification}/mark-as-read', [NotificationController::class, 'markAsRead'])->name('mark-as-read');
-        Route::post('/mark-all-as-read', [NotificationController::class, 'markAllAsRead'])->name('mark-all-as-read');
-        Route::delete('/{notification}', [NotificationController::class, 'destroy'])->name('destroy');
+    Route::controller(NotificationController::class)->prefix('notifications')->name('notifications.')->group(function () {
+        Route::get('/', 'index')->name('index');
+        Route::get('/stats', 'stats')->name('stats');
+        Route::post('/{notification}/mark-as-read', 'markAsRead')->name('mark-as-read');
+        Route::post('/mark-all-as-read', 'markAllAsRead')->name('mark-all-as-read');
+        Route::delete('/{notification}', 'destroy')->name('destroy');
     });
 
+    // ==========================================
+    // LOST MODE & COMMUNITY
+    // ==========================================
+    Route::controller(LostPetReportController::class)->group(function () {
+        Route::prefix('pets/{pet}/lost-reports')->group(function () {
+            Route::get('active', 'getActive');
+            Route::post('/', 'store');
+            Route::post('post-to-community', 'postToCommunity');
+            Route::post('mark-found', 'markAsFound');
+        });
+        
+        Route::get('community/lost-pets', 'communityFeed');
+    });
 });
 
 // ==========================================
@@ -187,7 +209,3 @@ Route::middleware(['auth:sanctum', 'throttle:api'])->prefix('v1')->name('api.v1.
 Route::fallback(function () {
     return response_error('The requested API endpoint does not exist.', [], 404);
 });
-
-
-
-
