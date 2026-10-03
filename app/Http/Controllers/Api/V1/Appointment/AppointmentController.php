@@ -48,10 +48,19 @@ class AppointmentController extends Controller
         });
 
         // Calculate stats
+        $statsQuery = Appointment::where('user_id', $request->user()->id);
+        
+        if ($request->has('pet_id')) {
+            $statsQuery->where('pet_id', $request->pet_id);
+        }
+        if ($request->has('type')) {
+            $statsQuery->where('type', $request->type);
+        }
+
         $stats = [
-            'upcoming' => Appointment::where('user_id', $request->user()->id)->where('status', 'upcoming')->count(),
-            'completed' => Appointment::where('user_id', $request->user()->id)->where('status', 'completed')->count(),
-            'this_month' => Appointment::where('user_id', $request->user()->id)->whereMonth('datetime', now()->month)->whereYear('datetime', now()->year)->count(),
+            'upcoming' => (clone $statsQuery)->where('status', 'upcoming')->count(),
+            'completed' => (clone $statsQuery)->where('status', 'completed')->count(),
+            'this_month' => (clone $statsQuery)->whereMonth('datetime', now()->month)->whereYear('datetime', now()->year)->count(),
         ];
 
         return response_success('Appointments retrieved successfully', [
@@ -111,6 +120,7 @@ class AppointmentController extends Controller
         return response_success('Notes retrieved', AppointmentNoteResource::collection($notes));
     }
 }
+
 
 
 

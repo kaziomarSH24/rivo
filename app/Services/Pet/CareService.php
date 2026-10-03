@@ -42,6 +42,23 @@ class CareService
 
         $levelInfo = $this->calculateLevelInfo($stat->total_xp);
 
+        // Calculate dynamic care streak
+        $streakDays = 0;
+        $date = Carbon::today();
+        while (true) {
+            $hasTask = $pet->careTaskLogs()->whereDate('completed_at', $date)->exists();
+            if ($hasTask) {
+                $streakDays++;
+                $date->subDay();
+            } else {
+                if ($date->isToday()) {
+                    $date->subDay();
+                    continue;
+                }
+                break;
+            }
+        }
+
         return [
             'summary' => [
                 'total_tasks' => $totalTasks,
@@ -49,7 +66,7 @@ class CareService
                 'progress_percentage' => $progress,
                 'xp_earned_today' => $xpEarnedToday,
                 'xp_earned_weekly' => $xpEarnedWeekly,
-                'streak_days' => $stat->current_streak_days,
+                'streak_days' => $streakDays,
                 'level' => $levelInfo['level_name'],
                 'current_xp' => $levelInfo['current_xp'],
                 'next_level_xp' => $levelInfo['next_level_xp'],
@@ -127,5 +144,6 @@ class CareService
         ];
     }
 }
+
 
 

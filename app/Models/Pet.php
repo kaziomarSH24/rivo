@@ -20,13 +20,23 @@ class Pet extends Model
         'age_years',
         'age_months',
         'weight',
+        'is_lost',
         'gender',
         'photo',
+    ];
+
+    protected $casts = [
+        'is_lost' => 'boolean',
     ];
 
     public function user(): BelongsTo
     {
         return $this->belongsTo(User::class);
+    }
+
+    public function lostReports()
+    {
+        return $this->hasMany(LostPetReport::class);
     }
 
     public function walkStats()
@@ -64,5 +74,7 @@ class Pet extends Model
         return $this->hasMany(HealthDocument::class);
     }
 }
+
+
 
 
