@@ -7,7 +7,7 @@ use App\Models\Pet;
 use App\Services\Social\ConnectionService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Gate;
-use App\Http\Resources\PetConnectionResource;
+use App\Http\Resources\Social\PetConnectionResource;
 
 class ConnectionController extends Controller
 {
@@ -88,5 +88,6 @@ class ConnectionController extends Controller
         }
     }
 }
+
 
 
