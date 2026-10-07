@@ -5,19 +5,48 @@ namespace Database\Seeders;
 use Illuminate\Database\Seeder;
 use App\Models\User;
 use App\Models\Pet;
+use App\Models\PetSwipe;
+use App\Models\PetConnection;
 use Illuminate\Support\Facades\Hash;
 
 class PetSocialSeeder extends Seeder
 {
     public function run(): void
     {
+        // Clear previous dummy data
+        $emails = [
+            'sarah@example.com', 'james@example.com', 'elena@example.com', 'david@example.com', 'farhan@example.com',
+            'sarah@yopmail.com', 'james@yopmail.com', 'elena@yopmail.com', 'david@yopmail.com', 'farhan@yopmail.com'
+        ];
+        
+        $dummyUsers = User::whereIn('email', $emails)->get();
+        foreach ($dummyUsers as $du) {
+            PetSwipe::where('pet_id', $du->pets()->pluck('id'))->delete();
+            PetConnection::where('pet_id', $du->pets()->pluck('id'))->delete();
+            $du->pets()->delete();
+            $du->delete();
+        }
+
+        // The user's account - just update coordinates if it exists, or create if missing
+        User::updateOrCreate(
+            ['email' => 'kaziomar@yopmail.com'],
+            [
+                'name' => 'Omar Faruk',
+                'phone_number' => '+1234567896',
+                'password' => Hash::make('11111111'),
+                'latitude' => 23.8103, // Exact Dhaka
+                'longitude' => 90.4125,
+                'email_verified_at' => now(),
+            ]
+        );
+
         // Coordinates near Dhaka (23.8103, 90.4125)
         $usersData = [
-            ['name' => 'Sarah M.', 'email' => 'sarah@example.com', 'lat' => 23.8103, 'lon' => 90.4125], // Exact
-            ['name' => 'James K.', 'email' => 'james@example.com', 'lat' => 23.8223, 'lon' => 90.4225], // ~2km
-            ['name' => 'Elena R.', 'email' => 'elena@example.com', 'lat' => 23.7503, 'lon' => 90.3925], // ~7km
-            ['name' => 'David M.', 'email' => 'david@example.com', 'lat' => 23.8903, 'lon' => 90.5125], // ~15km
-            ['name' => 'Farhan T.', 'email' => 'farhan@example.com', 'lat' => 24.8103, 'lon' => 91.4125], // ~150km (too far)
+            ['name' => 'Sarah M.', 'email' => 'sarah@yopmail.com', 'lat' => 23.8153, 'lon' => 90.4175], // ~1km
+            ['name' => 'James K.', 'email' => 'james@yopmail.com', 'lat' => 23.8223, 'lon' => 90.4225], // ~2km
+            ['name' => 'Elena R.', 'email' => 'elena@yopmail.com', 'lat' => 23.7503, 'lon' => 90.3925], // ~7km
+            ['name' => 'David M.', 'email' => 'david@yopmail.com', 'lat' => 23.8903, 'lon' => 90.5125], // ~15km
+            ['name' => 'Farhan T.', 'email' => 'farhan@yopmail.com', 'lat' => 24.8103, 'lon' => 91.4125], // ~150km (too far)
         ];
 
         $petsData = [
@@ -68,12 +97,12 @@ class PetSocialSeeder extends Seeder
                 ['email' => $userData['email']],
                 [
                     'name' => $userData['name'],
-                    'password' => Hash::make('password123'),
+                    'password' => Hash::make('11111111'),
                     'phone_number' => '0170000000' . $index,
                     'country_code' => '+880',
                     'latitude' => $userData['lat'],
                     'longitude' => $userData['lon'],
-                    
+                    'email_verified_at' => now(),
                 ]
             );
 
@@ -85,4 +114,3 @@ class PetSocialSeeder extends Seeder
         }
     }
 }
-
