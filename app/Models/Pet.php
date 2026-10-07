@@ -23,10 +23,19 @@ class Pet extends Model
         'is_lost',
         'gender',
         'photo',
+        'bio',
+        'traits',
+        'personality',
+        'energy_level',
+        'training_level',
+        'is_vaccinated',
     ];
 
     protected $casts = [
         'is_lost' => 'boolean',
+        'is_vaccinated' => 'boolean',
+        'traits' => 'array',
+        'personality' => 'array',
     ];
 
     public function user(): BelongsTo
@@ -74,6 +83,7 @@ class Pet extends Model
         return $this->hasMany(HealthDocument::class);
     }
 }
+
 
 
 

@@ -75,9 +75,23 @@ class MatchService extends BaseService
             }
         }
 
+        // Filter by breed
+        if (!empty($filters['breed']) && strtolower($filters['breed']) !== 'any breed') {
+            $query->where('breed', 'LIKE', '%' . $filters['breed'] . '%');
+        }
+
         // Filter by gender
         if (!empty($filters['gender']) && strtolower($filters['gender']) !== 'any') {
             $query->where('gender', strtolower($filters['gender']));
+        }
+
+        // Filter by vaccination
+        if (isset($filters['vaccinated'])) {
+            if ($filters['vaccinated'] === 'required') {
+                $query->where('is_vaccinated', true);
+            } elseif ($filters['vaccinated'] === 'not required') {
+                // Do nothing, show all
+            }
         }
 
         // Apply distance filter if coordinates available
@@ -149,3 +163,4 @@ class MatchService extends BaseService
         ];
     }
 }
+

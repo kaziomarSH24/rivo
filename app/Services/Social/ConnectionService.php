@@ -50,7 +50,7 @@ class ConnectionService extends BaseService
         if ($reverse) {
             // Auto accept if reverse exists
             $reverse->update(['status' => 'accepted']);
-    $conn =         return PetConnection::create([
+            $conn = PetConnection::create([
                 'pet_id' => $currentPet->id,
                 'connected_pet_id' => $targetPet->id,
                 'status' => 'accepted',
@@ -60,7 +60,7 @@ class ConnectionService extends BaseService
         return $conn;
         }
 
-$conn =         return PetConnection::create([
+        $conn = PetConnection::create([
             'pet_id' => $currentPet->id,
             'connected_pet_id' => $targetPet->id,
             'status' => 'pending',
@@ -113,4 +113,5 @@ $conn =         return PetConnection::create([
             ->paginate(20);
     }
 }
+
 
