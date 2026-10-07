@@ -30,6 +30,7 @@ class PetResource extends JsonResource
             'is_vaccinated' => (bool) $this->is_vaccinated,
             'gender' => $this->gender,
             'photo' => $this->photo ? url('storage/' . $this->photo) : null,
+            'compatibility' => $this->when($request->route('pet') instanceof \App\Models\Pet && $request->route('pet')->id !== $this->id, function() use ($request) { return $this->calculateCompatibilityWith($request->route('pet')); }),
             'distance' => $this->when(isset($this->distance), function() { return round((float) $this->distance, 1); }),
             'user' => new UserResource($this->whenLoaded('user')),
             'created_at' => $this->created_at,
@@ -37,6 +38,7 @@ class PetResource extends JsonResource
         ];
     }
 }
+
 
 
 
