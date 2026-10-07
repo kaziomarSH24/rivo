@@ -4,6 +4,8 @@ namespace App\Services\Social;
 
 use App\Models\PetConnection;
 use App\Models\Pet;
+use App\Notifications\FriendRequestNotification;
+use App\Notifications\FriendRequestAcceptedNotification;
 use App\Services\BaseService;
 
 class ConnectionService extends BaseService
@@ -48,20 +50,24 @@ class ConnectionService extends BaseService
         if ($reverse) {
             // Auto accept if reverse exists
             $reverse->update(['status' => 'accepted']);
-            return PetConnection::create([
+    $conn =         return PetConnection::create([
                 'pet_id' => $currentPet->id,
                 'connected_pet_id' => $targetPet->id,
                 'status' => 'accepted',
                 'source' => 'direct_request'
             ]);
+        $targetPet->user->notify(new FriendRequestNotification($currentPet, $targetPet));
+        return $conn;
         }
 
-        return PetConnection::create([
+$conn =         return PetConnection::create([
             'pet_id' => $currentPet->id,
             'connected_pet_id' => $targetPet->id,
             'status' => 'pending',
             'source' => 'direct_request'
         ]);
+        $targetPet->user->notify(new FriendRequestNotification($currentPet, $targetPet));
+        return $conn;
     }
 
     /**
@@ -86,6 +92,8 @@ class ConnectionService extends BaseService
                 'source' => 'direct_request'
             ]);
 
+            $requesterPet->user->notify(new FriendRequestAcceptedNotification($currentPet, $requesterPet));
+
             return $request;
         }
 
@@ -105,3 +113,4 @@ class ConnectionService extends BaseService
             ->paginate(20);
     }
 }
+

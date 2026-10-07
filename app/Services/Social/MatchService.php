@@ -5,6 +5,8 @@ namespace App\Services\Social;
 use App\Models\PetSwipe;
 use App\Models\Pet;
 use App\Models\PetConnection;
+use App\Notifications\NewLikeNotification;
+use App\Notifications\NewMatchNotification;
 use App\Services\BaseService;
 use Closure;
 
@@ -108,6 +110,10 @@ class MatchService extends BaseService
             ['action' => $action]
         );
 
+        if ($action === 'liked' && $swipe->wasRecentlyCreated) {
+            $targetPet->user->notify(new NewLikeNotification($currentPet, $targetPet));
+        }
+
         $isMatch = false;
 
         if ($action === 'liked') {
@@ -125,10 +131,15 @@ class MatchService extends BaseService
                     ['pet_id' => $currentPet->id, 'connected_pet_id' => $targetPet->id],
                     ['status' => 'accepted', 'source' => 'match']
                 );
+                
                 PetConnection::firstOrCreate(
                     ['pet_id' => $targetPet->id, 'connected_pet_id' => $currentPet->id],
                     ['status' => 'accepted', 'source' => 'match']
                 );
+
+                // Notify both users about the match
+                $currentPet->user->notify(new NewMatchNotification($targetPet, $currentPet));
+                $targetPet->user->notify(new NewMatchNotification($currentPet, $targetPet));
             }
         }
 

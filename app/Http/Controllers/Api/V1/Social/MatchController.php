@@ -23,14 +23,14 @@ class MatchController extends Controller
     public function discover(Request $request, Pet $pet)
     {
         // Authorize pet belongs to user
-Gate::authorize('view', $pet);
+        Gate::authorize('view', $pet);
 
         $filters = $request->only(['age', 'size', 'gender', 'distance']);
-        
+
         $pets = $this->matchService->discoverPets(
-            $pet, 
-            $filters, 
-            $request->user()->latitude, 
+            $pet,
+            $filters,
+            $request->user()->latitude,
             $request->user()->longitude
         );
 
@@ -46,7 +46,7 @@ Gate::authorize('view', $pet);
             'target_pet_id' => 'required|exists:pets,id',
             'action' => 'required|in:liked,passed'
         ]);
-Gate::authorize('view', $pet);
+        Gate::authorize('view', $pet);
 
         if ($pet->id == $request->target_pet_id) {
             return response_error('Cannot swipe on your own pet', [], 400);
