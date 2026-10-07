@@ -30,7 +30,15 @@ class ConnectionController extends Controller
                 ->where('status', 'accepted');
         });
 
-        return response_success('Connections retrieved', $connections);
+        $resource = \App\Http\Resources\Social\PetConnectionResource::collection($connections);
+        return response_success('Connections retrieved', [
+            'data' => $resource->items(),
+            'pagination' => [
+                'current_page' => $connections->currentPage(),
+                'last_page' => $connections->lastPage(),
+                'total' => $connections->total(),
+            ]
+        ]);
     }
 
     /**
@@ -42,7 +50,15 @@ class ConnectionController extends Controller
 
         $requests = $this->connectionService->getPendingRequests($pet);
 
-        return response_success('Pending requests retrieved', $requests);
+        $resource = \App\Http\Resources\Social\PetConnectionResource::collection($requests);
+        return response_success('Pending requests retrieved', [
+            'data' => $resource->items(),
+            'pagination' => [
+                'current_page' => $requests->currentPage(),
+                'last_page' => $requests->lastPage(),
+                'total' => $requests->total(),
+            ]
+        ]);
     }
 
     /**
