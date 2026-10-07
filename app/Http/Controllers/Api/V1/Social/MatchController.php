@@ -65,6 +65,10 @@ class MatchController extends Controller
 
         $result = $this->matchService->processSwipe($pet, $targetPet, $request->action);
 
+        if (isset($result['is_match']) && $result['is_match']) {
+            $result['compatibility'] = $pet->calculateCompatibilityWith($targetPet);
+        }
+
         return response_success('Swipe processed', $result);
     }
 }
