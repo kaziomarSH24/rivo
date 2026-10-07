@@ -6,6 +6,10 @@ use Illuminate\Database\Eloquent\Model;
 
 class PostMedia extends Model
 {
-    //
-}
+    protected $fillable = ['post_id', 'media_path', 'media_type', 'thumbnail_path', 'order'];
 
+    public function post()
+    {
+        return $this->belongsTo(Post::class);
+    }
+}
