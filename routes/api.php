@@ -201,6 +201,19 @@ Route::middleware(['auth:sanctum', 'throttle:api'])->prefix('v1')->name('api.v1.
         
         Route::get('community/lost-pets', 'communityFeed');
     });
+
+    // Social Module (Phase 1: Match & Connections)
+    Route::prefix('social')->group(function () {
+        // Discovery & Match
+        Route::get('discover/{pet}', [\App\Http\Controllers\Api\V1\Social\MatchController::class, 'discover']);
+        Route::post('swipe/{pet}', [\App\Http\Controllers\Api\V1\Social\MatchController::class, 'swipe']);
+
+        // Friends & Requests
+        Route::get('connections/{pet}', [\App\Http\Controllers\Api\V1\Social\ConnectionController::class, 'index']);
+        Route::get('requests/{pet}', [\App\Http\Controllers\Api\V1\Social\ConnectionController::class, 'requests']);
+        Route::post('request/send/{pet}', [\App\Http\Controllers\Api\V1\Social\ConnectionController::class, 'sendRequest']);
+        Route::post('request/respond/{pet}', [\App\Http\Controllers\Api\V1\Social\ConnectionController::class, 'respond']);
+    });
 });
 
 // ==========================================
@@ -209,3 +222,4 @@ Route::middleware(['auth:sanctum', 'throttle:api'])->prefix('v1')->name('api.v1.
 Route::fallback(function () {
     return response_error('The requested API endpoint does not exist.', [], 404);
 });
+

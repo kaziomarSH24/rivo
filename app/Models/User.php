@@ -43,6 +43,8 @@ class User extends Authenticatable
         'provider_name',
         'provider_id',
         'avatar',
+        'latitude',
+        'longitude',
         'plan_id',
         'revenuecat_app_user_id',
         'subscription_expires_at',
@@ -115,4 +117,5 @@ class User extends Authenticatable
         return $this->belongsTo(Plan::class);
     }
 }
+
 
