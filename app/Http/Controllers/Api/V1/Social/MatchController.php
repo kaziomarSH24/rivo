@@ -35,7 +35,15 @@ class MatchController extends Controller
             $request->user()->longitude
         );
 
-        return response_success('Potential matches retrieved', $pets);
+        $resource = \App\Http\Resources\Pet\PetResource::collection($pets);
+        return response_success('Potential matches retrieved', [
+            'data' => $resource->items(),
+            'pagination' => [
+                'current_page' => $pets->currentPage(),
+                'last_page' => $pets->lastPage(),
+                'total' => $pets->total(),
+            ]
+        ]);
     }
 
     /**
