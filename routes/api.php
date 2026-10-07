@@ -209,7 +209,7 @@ Route::middleware(['auth:sanctum', 'throttle:api'])->prefix('v1')->name('api.v1.
         Route::post('swipe/{pet}', [\App\Http\Controllers\Api\V1\Social\MatchController::class, 'swipe']);
 
         // Friends & Requests
-        Route::get('connections/{pet}', [\App\Http\Controllers\Api\V1\Social\ConnectionController::class, 'index']);
+        Route::get('match-list/{pet}', [\App\Http\Controllers\Api\V1\Social\ConnectionController::class, 'index']);
         Route::get('requests/{pet}', [\App\Http\Controllers\Api\V1\Social\ConnectionController::class, 'requests']);
         Route::post('request/send/{pet}', [\App\Http\Controllers\Api\V1\Social\ConnectionController::class, 'sendRequest']);
         Route::post('request/respond/{pet}', [\App\Http\Controllers\Api\V1\Social\ConnectionController::class, 'respond']);
