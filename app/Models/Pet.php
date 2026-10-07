@@ -11,7 +11,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class Pet extends Model
 {
-    use HasFactory, AutoClearsCache;
+    use HasFactory, AutoClearsCache, ComputesCompatibility;
 
     protected $fillable = [
         'user_id',
