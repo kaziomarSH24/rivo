@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api\V1\Social;
 
 use App\Http\Controllers\Controller;
 use App\Models\Pet;
+use App\Http\Resources\Pet\PetResource;
 use App\Services\Social\MatchService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Gate;
@@ -59,4 +60,5 @@ class MatchController extends Controller
         return response_success('Swipe processed', $result);
     }
 }
+
 
