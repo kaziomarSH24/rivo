@@ -18,8 +18,12 @@ class Post extends Model
         return $this->belongsTo(Pet::class);
     }
 
+    public function media() { return $this->hasMany(PostMedia::class)->orderBy('order'); }
+    public function comments() { return $this->hasMany(PostComment::class); }
+    public function likes() { return $this->hasMany(PostLike::class); }
     public function postable()
     {
         return $this->morphTo();
     }
 }
+
