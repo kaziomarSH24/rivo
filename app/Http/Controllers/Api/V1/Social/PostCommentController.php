@@ -41,6 +41,10 @@ class PostCommentController extends Controller
 
     public function store(StorePostCommentRequest $request, Post $post)
     {
+        if ($post->turn_off_commenting) {
+            return response_error('Commenting has been turned off for this post.', [], 403);
+        }
+
         $validated = $request->validated();
 
         $data = [

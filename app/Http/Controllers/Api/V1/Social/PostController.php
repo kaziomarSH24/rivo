@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Post;
 use App\Services\Social\PostService;
 use App\Http\Requests\Social\StorePostRequest;
+use App\Http\Requests\Social\UpdatePostRequest;
 use App\Http\Resources\Social\PostResource;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Gate;
@@ -21,7 +22,9 @@ class PostController extends Controller
 
     public function index(Request $request)
     {
-        $posts = $this->postService->getAll();
+        $posts = $this->postService->getAll(function ($query) {
+            $query->with(['user', 'pet', 'media', 'postable', 'likes'])->latest();
+        });
 
         $resource = PostResource::collection($posts);
         return response_success('Posts retrieved successfully', [
@@ -50,6 +53,21 @@ class PostController extends Controller
         return response_success('Post retrieved successfully', new PostResource($post));
     }
 
+    public function update(UpdatePostRequest $request, Post $post)
+    {
+        if ($post->user_id !== $request->user()->id) {
+            return response_error('Unauthorized to edit this post', [], 403);
+        }
+
+        $post = $this->postService->updatePost(
+            $post,
+            $request->validated(),
+            $request->file('media', [])
+        );
+
+        return response_success('Post updated successfully', new PostResource($post));
+    }
+
     public function toggleLike(Request $request, Post $post)
     {
         $result = $this->postService->toggleLike($post, $request->user()->id);
@@ -59,7 +77,7 @@ class PostController extends Controller
     public function destroy(Post $post)
     {
         if ($post->user_id !== request()->user()->id) {
-            return response_error('Unauthorized', [], 403);
+            return response_error('Unauthorized to delete this post', [], 403);
         }
 
         $post->delete();

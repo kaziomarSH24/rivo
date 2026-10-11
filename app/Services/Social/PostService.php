@@ -58,6 +58,9 @@ class PostService extends BaseService
                 'type' => $type,
                 'location' => $data['location'] ?? null,
                 'visibility' => $data['visibility'] ?? 'public',
+                'hide_like_count' => $data['hide_like_count'] ?? false,
+                'hide_share_count' => $data['hide_share_count'] ?? false,
+                'turn_off_commenting' => $data['turn_off_commenting'] ?? false,
                 'postable_type' => $postableType,
                 'postable_id' => $postableId,
             ]);
@@ -70,6 +73,50 @@ class PostService extends BaseService
                         'media_path' => $path,
                         'media_type' => $mediaType,
                         'order' => $index
+                    ]);
+                }
+            }
+
+            return $post->load(['user', 'pet', 'media', 'postable', 'likes']);
+        });
+    }
+
+    public function updatePost(Post $post, array $data, $mediaFiles = [])
+    {
+        return DB::transaction(function () use ($post, $data, $mediaFiles) {
+            $fillable = [
+                'content',
+                'location',
+                'visibility',
+                'hide_like_count',
+                'hide_share_count',
+                'turn_off_commenting',
+            ];
+
+            $updateData = array_intersect_key($data, array_flip($fillable));
+            if (!empty($updateData)) {
+                $post->update($updateData);
+            }
+
+            // Remove specific media files if requested
+            if (!empty($data['remove_media_ids'])) {
+                $mediaToRemove = $post->media()->whereIn('id', $data['remove_media_ids'])->get();
+                foreach ($mediaToRemove as $media) {
+                    Storage::disk('public')->delete($media->media_path);
+                    $media->delete();
+                }
+            }
+
+            // Upload new media files if provided
+            if (!empty($mediaFiles)) {
+                $highestOrder = (int) $post->media()->max('order');
+                foreach ($mediaFiles as $index => $file) {
+                    $path = $file->store('posts', 'public');
+                    $mediaType = str_starts_with($file->getMimeType(), 'video') ? 'video' : 'image';
+                    $post->media()->create([
+                        'media_path' => $path,
+                        'media_type' => $mediaType,
+                        'order' => $highestOrder + $index + 1
                     ]);
                 }
             }

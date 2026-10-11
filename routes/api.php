@@ -215,7 +215,7 @@ Route::middleware(['auth:sanctum', 'throttle:api'])->prefix('v1')->name('api.v1.
         Route::post('request/respond/{pet}', [\App\Http\Controllers\Api\V1\Social\ConnectionController::class, 'respond']);
 
         // Social Feed & Posts
-        Route::apiResource('posts', \App\Http\Controllers\Api\V1\Social\PostController::class)->except(['update']);
+        Route::apiResource('posts', \App\Http\Controllers\Api\V1\Social\PostController::class);
         Route::post('posts/{post}/like', [\App\Http\Controllers\Api\V1\Social\PostController::class, 'toggleLike']);
         Route::get('posts/{post}/comments', [\App\Http\Controllers\Api\V1\Social\PostCommentController::class, 'index']);
         Route::post('posts/{post}/comments', [\App\Http\Controllers\Api\V1\Social\PostCommentController::class, 'store']);
@@ -229,5 +229,6 @@ Route::middleware(['auth:sanctum', 'throttle:api'])->prefix('v1')->name('api.v1.
 Route::fallback(function () {
     return response_error('The requested API endpoint does not exist.', [], 404);
 });
+
 
 

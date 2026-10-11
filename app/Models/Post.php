@@ -10,6 +10,12 @@ class Post extends Model
     use AutoClearsCache;
     protected $guarded = ['id'];
 
+    protected $casts = [
+        'hide_like_count' => 'boolean',
+        'hide_share_count' => 'boolean',
+        'turn_off_commenting' => 'boolean',
+    ];
+
     public function user()
     {
         return $this->belongsTo(User::class);
@@ -37,4 +43,3 @@ class Post extends Model
         return $this->morphTo();
     }
 }
-
