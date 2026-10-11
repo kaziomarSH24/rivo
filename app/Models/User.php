@@ -15,6 +15,7 @@ use Laravel\Cashier\Billable;
 use Spatie\Activitylog\Traits\LogsActivity;
 use Spatie\Activitylog\LogOptions;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 
 class User extends Authenticatable
 {
@@ -61,7 +62,12 @@ class User extends Authenticatable
         'otp',
         'verification_token',
         'fcm_token',
-        'otp_expires_at'
+        'otp_expires_at',
+        'stripe_id',
+        'pm_type',
+        'pm_last_four',
+        'trial_ends_at',
+        'revenuecat_app_user_id',
     ];
 
     /**
@@ -115,6 +121,11 @@ class User extends Authenticatable
     public function plan(): BelongsTo
     {
         return $this->belongsTo(Plan::class);
+    }
+
+    public function conversations(): BelongsToMany
+    {
+        return $this->belongsToMany(Conversation::class)->withPivot('role');
     }
 }
 

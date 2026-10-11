@@ -55,12 +55,16 @@ class Conversation extends Model
                     return null;
                 }
 
-                $user = auth()->user();
+                if ($this->latestMessage->is_system) {
+                    return Str::limit($this->latestMessage->body, 35);
+                }
+
+                $user = auth('sanctum')->user() ?? request()->user() ?? auth()->user();
+                $currentUserId = $user?->id;
 
                 // check if the last message was sent by another user
-                if ($this->latestMessage->user_id !== $user->id) {
-                    // fetch first name of the sender for preview (like Omar faruk -> Omar)
-                    $senderFirstName = Str::before($this->latestMessage->user->name, ' ');
+                if (!$currentUserId || $this->latestMessage->user_id !== $currentUserId) {
+                    $senderFirstName = $this->latestMessage->user ? Str::before($this->latestMessage->user->name, ' ') : 'System';
 
                     if ($this->latestMessage->media_type) {
                         $mediaText = match ($this->latestMessage->media_type) {
@@ -97,16 +101,40 @@ class Conversation extends Model
     {
         return Attribute::make(
             get: function () {
-
                 if ($this->name) {
                     return $this->name;
                 }
+                $currentUserId = auth('sanctum')->id() ?? request()->user()?->id ?? auth()->id();
                 if ($this->users->count() === 2) {
-                    $otherUser = $this->users->firstWhere('id', '!=', auth()->id());
+                    $otherUser = $this->users->firstWhere('id', '!=', $currentUserId);
                     return $otherUser ? $otherUser->name : 'Conversation';
                 }
                 return 'Group Chat';
             }
         );
+    }
+
+    /**
+     * Find or create a direct 1-on-1 conversation between two users
+     */
+    public static function findOrCreateDirect(int $userId1, int $userId2): self
+    {
+        $userIds = [$userId1, $userId2];
+        sort($userIds);
+
+        $conversation = self::whereNull('name')
+            ->whereHas('users', fn($q) => $q->where('users.id', $userId1))
+            ->whereHas('users', fn($q) => $q->where('users.id', $userId2))
+            ->has('users', '=', 2)
+            ->first();
+
+        if (!$conversation) {
+            $conversation = self::create([
+                'created_by' => $userId1,
+            ]);
+            $conversation->users()->sync($userIds);
+        }
+
+        return $conversation;
     }
 }

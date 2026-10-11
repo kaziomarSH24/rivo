@@ -23,7 +23,7 @@ class ConversationController extends Controller
         $conversations = Conversation::query()
             ->whereHas('users', fn($q) => $q->where('user_id', $userId))
             ->with([
-                'users:id,name',
+                'users:id,name,avatar',
                 'latestMessage.user:id,name'
             ])
             ->withCount(['messages as unread_count' => function ($query) use ($userId) {
@@ -40,46 +40,45 @@ class ConversationController extends Controller
         return ConversationResource::collection($conversations);
     }
 
-    // Create a new conversation or return existing one for 1-on-1 chats
-     public function store(Request $request)
+    // Create a new conversation or return existing one for 1-on-1 chats (Requires pet match/connection)
+    public function store(Request $request)
     {
         $validated = $request->validate([
-            'user_ids' => 'required|array|min:1',
+            'user_ids' => 'required|array|size:1',
             'user_ids.*' => 'exists:users,id',
-            'name' => 'nullable|string|max:255',
         ]);
 
-        $userIds = array_unique(array_merge($validated['user_ids'], [$request->user()->id]));
-        sort($userIds);
+        $otherUserId = (int) $validated['user_ids'][0];
 
-        // If group chat (more than 2 users), always create a new conversation
-        if (count($userIds) > 2) {
-            $conversation = Conversation::create([
-                'name' => $validated['name'],
-                'created_by' => $request->user()->id,
-            ]);
-            $conversation->users()->sync($userIds);
-            $conversation->users()->updateExistingPivot($request->user()->id, ['role' => 'admin']);
-            return new ConversationResource($conversation->load('users'));
+        if ($otherUserId === (int) $request->user()->id) {
+            return response_error('You cannot start a conversation with yourself.', [], 400);
         }
 
-        // if 1-on-1 chat, check if conversation already exists
-        $existingConversation = $request->user()->conversations()
-            ->whereHas('users', function ($query) use ($userIds) {
-                $query->whereIn('user_id', $userIds);
-            }, '=', count($userIds))
-            ->whereHas('users', null, '=', count($userIds))
-            ->whereNull('name')
+        // Verify that the users have an accepted pet connection/match
+        $currentUserPetIds = $request->user()->pets()->pluck('id');
+        $otherUserPetIds = \App\Models\Pet::where('user_id', $otherUserId)->pluck('id');
+
+        $connection = \App\Models\PetConnection::whereIn('pet_id', $currentUserPetIds)
+            ->whereIn('connected_pet_id', $otherUserPetIds)
+            ->where('status', 'accepted')
             ->first();
 
-        if ($existingConversation) {
-            return response_success('Conversation already exists.', new ConversationResource($existingConversation->load('users')));
+        if (!$connection) {
+            return response_error('You can only start a conversation with matched pet owners.', [], 403);
         }
 
-        $conversation = Conversation::create(['created_by' => $request->user()->id]);
-        $conversation->users()->sync($userIds);
+        $conversation = Conversation::findOrCreateDirect($request->user()->id, $otherUserId);
 
-        return response_success('Conversation created successfully.', new ConversationResource($conversation->load('users')), 201);
+        // Ensure pet connection is linked with conversation_id if not already set
+        if (!$connection->conversation_id) {
+            $connection->update(['conversation_id' => $conversation->id]);
+            \App\Models\PetConnection::where('pet_id', $connection->connected_pet_id)
+                ->where('connected_pet_id', $connection->pet_id)
+                ->where('status', 'accepted')
+                ->update(['conversation_id' => $conversation->id]);
+        }
+
+        return response_success('Conversation retrieved successfully.', new ConversationResource($conversation->load('users')));
     }
 
 }

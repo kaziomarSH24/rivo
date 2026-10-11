@@ -14,6 +14,7 @@ class PetConnectionResource extends JsonResource
             'id' => $this->id,
             'pet_id' => $this->pet_id,
             'connected_pet_id' => $this->connected_pet_id,
+            'conversation_id' => $this->conversation_id,
             'status' => $this->status,
             'source' => $this->source,
             'pet' => new PetResource($this->whenLoaded('pet')),

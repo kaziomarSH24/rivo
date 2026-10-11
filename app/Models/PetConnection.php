@@ -17,6 +17,7 @@ class PetConnection extends Model
         'connected_pet_id',
         'status',
         'source',
+        'conversation_id',
     ];
 
     public function pet(): BelongsTo
@@ -27,5 +28,10 @@ class PetConnection extends Model
     public function connectedPet(): BelongsTo
     {
         return $this->belongsTo(Pet::class, 'connected_pet_id');
+    }
+
+    public function conversation(): BelongsTo
+    {
+        return $this->belongsTo(Conversation::class);
     }
 }

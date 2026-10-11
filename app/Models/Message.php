@@ -11,7 +11,7 @@ use Illuminate\Database\Eloquent\SoftDeletes;
 class Message extends Model
 {
     use HasFactory, SoftDeletes;
-    protected $fillable = ['conversation_id', 'user_id', 'body', 'media_url', 'media_type', 'parent_id', 'edited_at'];
+    protected $fillable = ['conversation_id', 'user_id', 'body', 'media_url', 'media_type', 'parent_id', 'edited_at', 'is_system'];
     protected $with = ['user'];
 
     protected $touches = ['conversation'];
@@ -51,5 +51,12 @@ class Message extends Model
     public function getMediaUrlAttribute($value)
     {
         return $value ? asset('storage/' . $value) : null;
+    }
+
+    protected function casts(): array
+    {
+        return [
+            'is_system' => 'boolean',
+        ];
     }
 }

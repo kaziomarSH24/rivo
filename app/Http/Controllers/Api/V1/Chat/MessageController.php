@@ -70,7 +70,7 @@ class MessageController extends Controller
         ]);
 
         broadcast(new MessageSent($message))->toOthers();
-        return response_success('Message sent.', $message, 201);
+        return response_success('Message sent.', new MessageResource($message->load('user')), 201);
     }
 
     /**

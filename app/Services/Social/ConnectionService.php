@@ -3,6 +3,7 @@
 namespace App\Services\Social;
 
 use App\Models\PetConnection;
+use App\Models\Conversation;
 use App\Models\Pet;
 use App\Notifications\FriendRequestNotification;
 use App\Notifications\FriendRequestAcceptedNotification;
@@ -48,16 +49,26 @@ class ConnectionService extends BaseService
             ->first();
 
         if ($reverse) {
+            $conversation = Conversation::findOrCreateDirect($currentPet->user_id, $targetPet->user_id);
+
+            if ($conversation->messages()->count() === 0) {
+                $conversation->messages()->create([
+                    'body' => "🐾 {$currentPet->name} and {$targetPet->name} are now connected. Say hello!",
+                    'is_system' => true,
+                    'user_id' => null,
+                ]);
+            }
             // Auto accept if reverse exists
-            $reverse->update(['status' => 'accepted']);
+            $reverse->update(['status' => 'accepted', 'conversation_id' => $conversation->id]);
             $conn = PetConnection::create([
                 'pet_id' => $currentPet->id,
                 'connected_pet_id' => $targetPet->id,
                 'status' => 'accepted',
-                'source' => 'direct_request'
+                'source' => 'direct_request',
+                'conversation_id' => $conversation->id,
             ]);
-        $targetPet->user->notify(new FriendRequestNotification($currentPet, $targetPet));
-        return $conn;
+            $targetPet->user->notify(new FriendRequestNotification($currentPet, $targetPet));
+            return $conn;
         }
 
         $conn = PetConnection::create([
@@ -81,15 +92,26 @@ class ConnectionService extends BaseService
             ->firstOrFail();
 
         if ($action === 'accepted') {
-            $request->update(['status' => 'accepted']);
+            $conversation = Conversation::findOrCreateDirect($currentPet->user_id, $requesterPet->user_id);
+
+            if ($conversation->messages()->count() === 0) {
+                $conversation->messages()->create([
+                    'body' => "🐾 {$currentPet->name} and {$requesterPet->name} are now connected. Say hello!",
+                    'is_system' => true,
+                    'user_id' => null,
+                ]);
+            }
+
+            $request->update(['status' => 'accepted', 'conversation_id' => $conversation->id]);
             
             // Create the reverse connection for easy querying
-            PetConnection::firstOrCreate([
+            PetConnection::updateOrCreate([
                 'pet_id' => $currentPet->id,
                 'connected_pet_id' => $requesterPet->id,
             ], [
                 'status' => 'accepted',
-                'source' => 'direct_request'
+                'source' => 'direct_request',
+                'conversation_id' => $conversation->id,
             ]);
 
             $requesterPet->user->notify(new FriendRequestAcceptedNotification($currentPet, $requesterPet));

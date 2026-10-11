@@ -5,6 +5,7 @@ namespace App\Services\Social;
 use App\Models\PetSwipe;
 use App\Models\Pet;
 use App\Models\PetConnection;
+use App\Models\Conversation;
 use App\Notifications\NewLikeNotification;
 use App\Notifications\NewMatchNotification;
 use App\Services\BaseService;
@@ -140,15 +141,26 @@ class MatchService extends BaseService
             if ($mutualSwipe) {
                 $isMatch = true;
 
-                // Create connections for both
-                PetConnection::firstOrCreate(
+                $conversation = Conversation::findOrCreateDirect($currentPet->user_id, $targetPet->user_id);
+
+                // Send initial system message if conversation has no messages
+                if ($conversation->messages()->count() === 0) {
+                    $conversation->messages()->create([
+                        'body' => "🎉 It's a Match! {$currentPet->name} and {$targetPet->name} liked each other. Say hello!",
+                        'is_system' => true,
+                        'user_id' => null,
+                    ]);
+                }
+
+                // Create or update connections for both with conversation_id
+                PetConnection::updateOrCreate(
                     ['pet_id' => $currentPet->id, 'connected_pet_id' => $targetPet->id],
-                    ['status' => 'accepted', 'source' => 'match']
+                    ['status' => 'accepted', 'source' => 'match', 'conversation_id' => $conversation->id]
                 );
                 
-                PetConnection::firstOrCreate(
+                PetConnection::updateOrCreate(
                     ['pet_id' => $targetPet->id, 'connected_pet_id' => $currentPet->id],
-                    ['status' => 'accepted', 'source' => 'match']
+                    ['status' => 'accepted', 'source' => 'match', 'conversation_id' => $conversation->id]
                 );
 
                 // Notify both users about the match
@@ -159,7 +171,8 @@ class MatchService extends BaseService
 
         return [
             'swipe' => $swipe,
-            'is_match' => $isMatch
+            'is_match' => $isMatch,
+            'conversation_id' => isset($conversation) ? $conversation->id : null,
         ];
     }
 }
