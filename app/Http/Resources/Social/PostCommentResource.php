@@ -12,8 +12,12 @@ class PostCommentResource extends JsonResource
     {
         return [
             'id' => $this->id,
+            'post_id' => $this->post_id,
+            'parent_id' => $this->parent_id,
             'content' => $this->content,
             'user' => new UserResource($this->whenLoaded('user')),
+            'replies_count' => $this->whenLoaded('replies', fn() => $this->replies->count()),
+            'replies' => PostCommentResource::collection($this->whenLoaded('replies')),
             'created_at' => $this->created_at,
             'updated_at' => $this->updated_at,
         ];

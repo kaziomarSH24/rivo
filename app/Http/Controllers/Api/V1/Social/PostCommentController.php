@@ -20,9 +20,12 @@ class PostCommentController extends Controller
 
     public function index(Request $request, Post $post)
     {
+        // Fetch top-level comments with replies
         $comments = $this->commentService->getAll(function($q) use ($post) {
-            $q->where('post_id', $post->id);
+            $q->where('post_id', $post->id)
+              ->whereNull('parent_id');
         });
+        $comments->load(['user', 'replies.user']);
 
         $resource = PostCommentResource::collection($comments);
         return response_success('Comments retrieved', [
@@ -37,12 +40,16 @@ class PostCommentController extends Controller
 
     public function store(Request $request, Post $post)
     {
-        $request->validate([
-            'content' => 'required|string|max:1000'
+        $validated = $request->validate([
+            'content' => 'required|string|max:1000',
+            'parent_id' => 'nullable|exists:post_comments,id',
         ]);
 
-        $data = $request->only('content');
-        $data['user_id'] = $request->user()->id;
+        $data = [
+            'content' => $validated['content'],
+            'parent_id' => $validated['parent_id'] ?? null,
+            'user_id' => $request->user()->id,
+        ];
 
         $comment = $this->commentService->createComment($post, $data);
 

@@ -13,12 +13,12 @@ class PostCommentService extends BaseService
 
     protected function getAllowedFilters(): array
     {
-        return ['post_id', 'user_id'];
+        return ['post_id', 'user_id', 'parent_id'];
     }
 
     protected function getAllowedIncludes(): array
     {
-        return ['user', 'post'];
+        return ['user', 'post', 'replies', 'parent'];
     }
 
     protected function getAllowedSorts(): array
@@ -31,12 +31,13 @@ class PostCommentService extends BaseService
         return DB::transaction(function () use ($post, $data) {
             $comment = $post->comments()->create([
                 'user_id' => $data['user_id'],
+                'parent_id' => $data['parent_id'] ?? null,
                 'content' => $data['content']
             ]);
 
             $post->increment('comments_count');
 
-            return $comment->load('user');
+            return $comment->load(['user', 'replies']);
         });
     }
 }

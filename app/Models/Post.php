@@ -2,10 +2,12 @@
 
 namespace App\Models;
 
+use App\Traits\AutoClearsCache;
 use Illuminate\Database\Eloquent\Model;
 
 class Post extends Model
 {
+    use AutoClearsCache;
     protected $guarded = ['id'];
 
     public function user()
@@ -18,9 +20,18 @@ class Post extends Model
         return $this->belongsTo(Pet::class);
     }
 
-    public function media() { return $this->hasMany(PostMedia::class)->orderBy('order'); }
-    public function comments() { return $this->hasMany(PostComment::class); }
-    public function likes() { return $this->hasMany(PostLike::class); }
+    public function media()
+    {
+        return $this->hasMany(PostMedia::class)->orderBy('order');
+    }
+    public function comments()
+    {
+        return $this->hasMany(PostComment::class);
+    }
+    public function likes()
+    {
+        return $this->hasMany(PostLike::class);
+    }
     public function postable()
     {
         return $this->morphTo();
