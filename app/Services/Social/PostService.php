@@ -4,6 +4,7 @@ namespace App\Services\Social;
 
 use App\Models\Post;
 use App\Models\PostLike;
+use App\Models\WalkSession;
 use App\Services\BaseService;
 use App\Notifications\PostLiked;
 use Illuminate\Support\Facades\Storage;
@@ -15,12 +16,12 @@ class PostService extends BaseService
 
     protected function getAllowedFilters(): array
     {
-        return ['type', 'user_id', 'pet_id'];
+        return ['type', 'user_id', 'pet_id', 'visibility'];
     }
 
     protected function getAllowedIncludes(): array
     {
-        return ['user', 'pet', 'media', 'comments', 'likes'];
+        return ['user', 'pet', 'media', 'comments', 'likes', 'postable'];
     }
 
     protected function getAllowedSorts(): array
@@ -31,26 +32,49 @@ class PostService extends BaseService
     public function createPost(array $data, $mediaFiles = [])
     {
         return DB::transaction(function () use ($data, $mediaFiles) {
+            $postableType = null;
+            $postableId = null;
+
+            $type = $data['type'] ?? 'general';
+
+            if (!empty($data['walk_session_id'])) {
+                $type = 'walk_summary';
+                $walkSession = WalkSession::findOrFail($data['walk_session_id']);
+                $postableType = WalkSession::class;
+                $postableId = $walkSession->id;
+
+                if (empty($data['pet_id'])) {
+                    $data['pet_id'] = $walkSession->pet_id;
+                }
+            } elseif (!empty($data['postable_type']) && !empty($data['postable_id'])) {
+                $postableType = $data['postable_type'];
+                $postableId = $data['postable_id'];
+            }
+
             $post = Post::create([
                 'user_id' => $data['user_id'],
                 'pet_id' => $data['pet_id'] ?? null,
                 'content' => $data['content'] ?? null,
-                'type' => $data['type'] ?? 'general',
+                'type' => $type,
+                'location' => $data['location'] ?? null,
+                'visibility' => $data['visibility'] ?? 'public',
+                'postable_type' => $postableType,
+                'postable_id' => $postableId,
             ]);
 
             if (!empty($mediaFiles)) {
                 foreach ($mediaFiles as $index => $file) {
                     $path = $file->store('posts', 'public');
-                    $type = str_starts_with($file->getMimeType(), 'video') ? 'video' : 'image';
+                    $mediaType = str_starts_with($file->getMimeType(), 'video') ? 'video' : 'image';
                     $post->media()->create([
                         'media_path' => $path,
-                        'media_type' => $type,
+                        'media_type' => $mediaType,
                         'order' => $index
                     ]);
                 }
             }
 
-            return $post->load(['user', 'pet', 'media']);
+            return $post->load(['user', 'pet', 'media', 'postable', 'likes']);
         });
     }
 

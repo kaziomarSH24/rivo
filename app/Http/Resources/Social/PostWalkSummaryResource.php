@@ -1,0 +1,36 @@
+<?php
+
+namespace App\Http\Resources\Social;
+
+use Illuminate\Http\Request;
+use Illuminate\Http\Resources\Json\JsonResource;
+use App\Http\Resources\Pet\PetResource;
+use App\Http\Resources\Walk\WalkRouteResource;
+
+class PostWalkSummaryResource extends JsonResource
+{
+    /**
+     * Transform the walk session resource into an array for social feed cards.
+     */
+    public function toArray(Request $request): array
+    {
+        return [
+            'id' => $this->id,
+            'pet_id' => $this->pet_id,
+            'route_id' => $this->route_id,
+            'distance_km' => (float) $this->distance_km,
+            'duration_seconds' => $this->duration_seconds,
+            'duration_formatted' => gmdate('H:i:s', (int) ($this->duration_seconds ?? 0)),
+            'steps' => $this->steps,
+            'calories' => $this->calories,
+            'avg_speed_kmh' => (float) $this->avg_speed_kmh,
+            'start_time' => $this->start_time,
+            'end_time' => $this->end_time,
+            'route_coordinates' => $this->route_coordinates,
+            'xp_earned' => $this->xp_earned,
+            'route' => new WalkRouteResource($this->whenLoaded('route')),
+            'pet' => new PetResource($this->whenLoaded('pet')),
+            'created_at' => $this->created_at,
+        ];
+    }
+}

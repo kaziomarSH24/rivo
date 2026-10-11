@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api\V1\Social;
 use App\Http\Controllers\Controller;
 use App\Models\Post;
 use App\Services\Social\PostService;
+use App\Http\Requests\Social\StorePostRequest;
 use App\Http\Resources\Social\PostResource;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Gate;
@@ -33,26 +34,19 @@ class PostController extends Controller
         ]);
     }
 
-    public function store(Request $request)
+    public function store(StorePostRequest $request)
     {
-        $request->validate([
-            'content' => 'required_without:media|string',
-            'type' => 'sometimes|in:general,lost_pet,milestone',
-            'pet_id' => 'sometimes|exists:pets,id',
-            'media.*' => 'sometimes|file|mimes:jpeg,png,jpg,gif,mp4,mov|max:20480',
-        ]);
-
-        $data = $request->all();
+        $data = $request->validated();
         $data['user_id'] = $request->user()->id;
 
         $post = $this->postService->createPost($data, $request->file('media', []));
 
-        return response_success('Post created successfully', new PostResource($post));
+        return response_success('Post created successfully', new PostResource($post), 201);
     }
 
     public function show(Post $post)
     {
-        $post->load(['user', 'pet', 'media', 'comments.user', 'likes']);
+        $post->load(['user', 'pet', 'media', 'comments.user', 'likes', 'postable']);
         return response_success('Post retrieved successfully', new PostResource($post));
     }
 

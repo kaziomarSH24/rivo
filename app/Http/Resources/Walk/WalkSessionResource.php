@@ -2,10 +2,7 @@
 
 namespace App\Http\Resources\Walk;
 
-
-
 use App\Http\Resources\Pet\PetResource;
-
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 
@@ -19,6 +16,7 @@ class WalkSessionResource extends JsonResource
             'route_id' => $this->route_id,
             'distance_km' => (float) $this->distance_km,
             'duration_seconds' => $this->duration_seconds,
+            'duration_formatted' => gmdate('H:i:s', (int) ($this->duration_seconds ?? 0)),
             'steps' => $this->steps,
             'calories' => $this->calories,
             'avg_speed_kmh' => (float) $this->avg_speed_kmh,
@@ -32,6 +30,3 @@ class WalkSessionResource extends JsonResource
         ];
     }
 }
-
-
-

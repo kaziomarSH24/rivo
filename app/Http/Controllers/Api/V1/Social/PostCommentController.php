@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Post;
 use App\Models\PostComment;
 use App\Services\Social\PostCommentService;
+use App\Http\Requests\Social\StorePostCommentRequest;
 use App\Http\Resources\Social\PostCommentResource;
 use Illuminate\Http\Request;
 
@@ -38,12 +39,9 @@ class PostCommentController extends Controller
         ]);
     }
 
-    public function store(Request $request, Post $post)
+    public function store(StorePostCommentRequest $request, Post $post)
     {
-        $validated = $request->validate([
-            'content' => 'required|string|max:1000',
-            'parent_id' => 'nullable|exists:post_comments,id',
-        ]);
+        $validated = $request->validated();
 
         $data = [
             'content' => $validated['content'],
@@ -53,7 +51,7 @@ class PostCommentController extends Controller
 
         $comment = $this->commentService->createComment($post, $data);
 
-        return response_success('Comment added successfully', new PostCommentResource($comment));
+        return response_success('Comment added successfully', new PostCommentResource($comment), 201);
     }
 
     public function destroy(Post $post, PostComment $comment)
