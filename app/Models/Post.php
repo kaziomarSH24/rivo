@@ -11,6 +11,7 @@ class Post extends Model
     protected $guarded = ['id'];
 
     protected $casts = [
+        'metadata' => 'array',
         'hide_like_count' => 'boolean',
         'hide_share_count' => 'boolean',
         'turn_off_commenting' => 'boolean',

@@ -54,7 +54,9 @@ class PostService extends BaseService
             $post = Post::create([
                 'user_id' => $data['user_id'],
                 'pet_id' => $data['pet_id'] ?? null,
+                'title' => $data['title'] ?? null,
                 'content' => $data['content'] ?? null,
+                'metadata' => $data['metadata'] ?? null,
                 'type' => $type,
                 'location' => $data['location'] ?? null,
                 'visibility' => $data['visibility'] ?? 'public',
@@ -85,7 +87,9 @@ class PostService extends BaseService
     {
         return DB::transaction(function () use ($post, $data, $mediaFiles) {
             $fillable = [
+                'title',
                 'content',
+                'metadata',
                 'location',
                 'visibility',
                 'hide_like_count',
@@ -125,23 +129,55 @@ class PostService extends BaseService
         });
     }
 
+    public function toggleReaction(Post $post, $userId, string $reactionType = 'bone')
+    {
+        $reactionType = in_array($reactionType, ['bone', 'fire']) ? $reactionType : 'bone';
+        $countColumn = $reactionType === 'fire' ? 'fires_count' : 'bones_count';
+
+        $existing = PostLike::where('post_id', $post->id)
+            ->where('user_id', $userId)
+            ->where('reaction_type', $reactionType)
+            ->first();
+
+        if ($existing) {
+            $existing->delete();
+            $post->decrement($countColumn);
+            if ($post->likes_count > 0) {
+                $post->decrement('likes_count');
+            }
+            $status = 'unreacted';
+        } else {
+            PostLike::create([
+                'post_id' => $post->id,
+                'user_id' => $userId,
+                'reaction_type' => $reactionType,
+            ]);
+            $post->increment($countColumn);
+            $post->increment('likes_count');
+            $status = 'reacted';
+        }
+
+        $post->refresh();
+
+        $userReactions = PostLike::where('post_id', $post->id)
+            ->where('user_id', $userId)
+            ->pluck('reaction_type')
+            ->toArray();
+
+        return [
+            'status' => $status,
+            'reaction_type' => $reactionType,
+            'bones_count' => (int) $post->bones_count,
+            'fires_count' => (int) $post->fires_count,
+            'likes_count' => (int) $post->likes_count,
+            'user_reactions' => $userReactions,
+            'user_has_boned' => in_array('bone', $userReactions),
+            'user_has_fired' => in_array('fire', $userReactions),
+        ];
+    }
+
     public function toggleLike(Post $post, $userId)
     {
-        $like = PostLike::where('post_id', $post->id)->where('user_id', $userId)->first();
-        
-        if ($like) {
-            $like->delete();
-            $post->decrement('likes_count');
-            return ['status' => 'unliked', 'likes_count' => $post->likes_count];
-        } else {
-            PostLike::create(['post_id' => $post->id, 'user_id' => $userId]);
-            $post->increment('likes_count');
-            
-            // Notify if the user is not the owner
-            if ($post->user_id !== $userId) {
-                // $post->user->notify(new PostLiked($post, $userId));
-            }
-            return ['status' => 'liked', 'likes_count' => $post->likes_count];
-        }
+        return $this->toggleReaction($post, $userId, 'bone');
     }
 }

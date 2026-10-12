@@ -70,7 +70,8 @@ class PostController extends Controller
 
     public function toggleLike(Request $request, Post $post)
     {
-        $result = $this->postService->toggleLike($post, $request->user()->id);
+        $reactionType = $request->input('reaction_type', 'bone');
+        $result = $this->postService->toggleReaction($post, $request->user()->id, $reactionType);
         return response_success('Post ' . $result['status'], $result);
     }
 

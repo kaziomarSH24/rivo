@@ -14,7 +14,9 @@ class UpdatePostRequest extends BaseRequest
     public function rules(): array
     {
         return [
+            'title' => 'sometimes|nullable|string|max:255',
             'content' => 'sometimes|nullable|string|max:500',
+            'metadata' => 'sometimes|nullable|array',
             'location' => 'sometimes|nullable|string|max:255',
             'visibility' => 'sometimes|in:public,followers,private',
             'hide_like_count' => 'sometimes|boolean',

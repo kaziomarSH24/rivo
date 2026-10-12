@@ -14,8 +14,10 @@ class StorePostRequest extends BaseRequest
     public function rules(): array
     {
         return [
-            'content' => 'required_without_all:media,walk_session_id|nullable|string',
-            'type' => 'sometimes|in:general,lost_pet,milestone,walk_summary,training_achievement',
+            'title' => 'sometimes|nullable|string|max:255',
+            'content' => 'required_without_all:media,walk_session_id,metadata|nullable|string',
+            'metadata' => 'sometimes|nullable|array',
+            'type' => 'sometimes|in:general,lost_pet,milestone,walk_summary,training_achievement,achievement,training',
             'pet_id' => 'sometimes|nullable|exists:pets,id',
             'walk_session_id' => 'required_if:type,walk_summary|nullable|exists:walk_sessions,id',
             'location' => 'sometimes|nullable|string|max:255',
