@@ -14,13 +14,22 @@ class PostResource extends JsonResource
     {
         $userId = $request->user()?->id;
 
-        $userReactions = [];
-        if ($userId && $this->relationLoaded('likes')) {
-            $userReactions = $this->likes->where('user_id', $userId)->pluck('reaction_type')->toArray();
+        $counts = $this->reaction_counts ?? [];
+        if (empty($counts) && $this->relationLoaded('reactions')) {
+            $counts = $this->reactions->groupBy('reaction_type')->map->count()->toArray();
         }
 
-        $userHasBoned = in_array('bone', $userReactions);
-        $userHasFired = in_array('fire', $userReactions);
+        $userReactions = [];
+        if ($userId && $this->relationLoaded('reactions')) {
+            $userReactions = $this->reactions->where('user_id', $userId)->pluck('reaction_type')->values()->toArray();
+        }
+
+        $bonesCount = (int) ($counts['bone'] ?? 0);
+        $firesCount = (int) ($counts['fire'] ?? 0);
+        $pawsCount = (int) ($counts['paw'] ?? 0);
+        $heartsCount = (int) ($counts['heart'] ?? 0);
+        $clapsCount = (int) ($counts['clap'] ?? 0);
+        $totalLikes = (int) ($this->likes_count ?: array_sum($counts));
 
         return [
             'id' => $this->id,
@@ -32,19 +41,31 @@ class PostResource extends JsonResource
             'hide_like_count' => (bool) $this->hide_like_count,
             'hide_share_count' => (bool) $this->hide_share_count,
             'turn_off_commenting' => (bool) $this->turn_off_commenting,
-            'likes_count' => (int) $this->likes_count,
-            'bones_count' => (int) $this->bones_count,
-            'fires_count' => (int) $this->fires_count,
+            'likes_count' => $totalLikes,
+            'bones_count' => $bonesCount,
+            'fires_count' => $firesCount,
+            'paws_count' => $pawsCount,
+            'hearts_count' => $heartsCount,
+            'claps_count' => $clapsCount,
             'reactions' => [
-                'bones_count' => (int) $this->bones_count,
-                'fires_count' => (int) $this->fires_count,
-                'user_has_boned' => $userHasBoned,
-                'user_has_fired' => $userHasFired,
+                'total' => $totalLikes,
+                'counts' => [
+                    'bone' => $bonesCount,
+                    'fire' => $firesCount,
+                    'paw' => $pawsCount,
+                    'heart' => $heartsCount,
+                    'clap' => $clapsCount,
+                ],
                 'user_reactions' => $userReactions,
+                'user_has_boned' => in_array('bone', $userReactions),
+                'user_has_fired' => in_array('fire', $userReactions),
+                'user_has_pawed' => in_array('paw', $userReactions),
+                'user_has_hearted' => in_array('heart', $userReactions),
+                'user_has_clapped' => in_array('clap', $userReactions),
             ],
             'comments_count' => (int) $this->comments_count,
             'shares_count' => (int) $this->shares_count,
-            'is_liked' => $userHasBoned || ($userId && $this->relationLoaded('likes') ? $this->likes->contains('user_id', $userId) : false),
+            'is_liked' => !empty($userReactions),
             'created_at' => $this->created_at,
             'updated_at' => $this->updated_at,
             'user' => new UserResource($this->whenLoaded('user')),

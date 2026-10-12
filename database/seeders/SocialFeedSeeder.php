@@ -7,7 +7,7 @@ use App\Models\User;
 use App\Models\Pet;
 use App\Models\Post;
 use App\Models\WalkSession;
-use App\Models\PostLike;
+use App\Models\Reaction;
 use App\Models\PostComment;
 use Illuminate\Support\Facades\Hash;
 
@@ -116,21 +116,26 @@ class SocialFeedSeeder extends Seeder
             'visibility' => 'public',
             'postable_type' => WalkSession::class,
             'postable_id' => $lunaWalk->id,
-            'bones_count' => 14,
-            'fires_count' => 6,
-            'likes_count' => 20,
+            'likes_count' => 36,
+            'reaction_counts' => [
+                'bone' => 14,
+                'fire' => 6,
+                'paw' => 5,
+                'heart' => 8,
+                'clap' => 3,
+            ],
             'comments_count' => 2,
             'created_at' => now()->subMinutes(18),
         ]);
 
-        PostComment::create([
+        $comment1 = PostComment::create([
             'post_id' => $post1->id,
             'user_id' => $elena->id,
             'content' => "So cute! Love Luna's energy in the morning 😍",
             'created_at' => now()->subMinutes(10),
         ]);
 
-        PostComment::create([
+        $comment2 = PostComment::create([
             'post_id' => $post1->id,
             'user_id' => $james->id,
             'content' => 'Great pace! Perfect weather for a long walk 🐾',
@@ -155,9 +160,14 @@ class SocialFeedSeeder extends Seeder
                 'distance_km' => 50.0,
                 'xp_earned' => 200,
             ],
-            'bones_count' => 31,
-            'fires_count' => 18,
-            'likes_count' => 49,
+            'likes_count' => 96,
+            'reaction_counts' => [
+                'bone' => 31,
+                'fire' => 18,
+                'paw' => 12,
+                'heart' => 20,
+                'clap' => 15,
+            ],
             'comments_count' => 1,
             'created_at' => now()->subHour(),
         ]);
@@ -187,18 +197,39 @@ class SocialFeedSeeder extends Seeder
                 'total_walks' => 7,
                 'total_km' => 28.4,
             ],
-            'bones_count' => 48,
-            'fires_count' => 33,
-            'likes_count' => 81,
+            'likes_count' => 176,
+            'reaction_counts' => [
+                'bone' => 48,
+                'fire' => 33,
+                'paw' => 25,
+                'heart' => 40,
+                'clap' => 30,
+            ],
             'comments_count' => 0,
             'created_at' => now()->subHours(2),
         ]);
 
-        // Add a reaction from current user Omar to Post 1
-        PostLike::create([
-            'post_id' => $post1->id,
+        // 6. User Omar reactions
+        Reaction::create([
             'user_id' => $omar->id,
+            'reactable_type' => Post::class,
+            'reactable_id' => $post1->id,
             'reaction_type' => 'bone',
+        ]);
+
+        Reaction::create([
+            'user_id' => $omar->id,
+            'reactable_type' => Post::class,
+            'reactable_id' => $post1->id,
+            'reaction_type' => 'heart',
+        ]);
+
+        // Comment reaction (heart on Elena's comment)
+        Reaction::create([
+            'user_id' => $omar->id,
+            'reactable_type' => PostComment::class,
+            'reactable_id' => $comment1->id,
+            'reaction_type' => 'heart',
         ]);
     }
 }

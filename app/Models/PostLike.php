@@ -2,19 +2,10 @@
 
 namespace App\Models;
 
-use Illuminate\Database\Eloquent\Model;
-
-class PostLike extends Model
+/**
+ * Backward-compatible alias for Reaction model.
+ */
+class PostLike extends Reaction
 {
-    protected $fillable = ['user_id', 'post_id', 'reaction_type'];
-
-    public function user()
-    {
-        return $this->belongsTo(User::class);
-    }
-
-    public function post()
-    {
-        return $this->belongsTo(Post::class);
-    }
+    //
 }

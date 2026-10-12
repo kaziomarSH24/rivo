@@ -12,6 +12,7 @@ class Post extends Model
 
     protected $casts = [
         'metadata' => 'array',
+        'reaction_counts' => 'array',
         'hide_like_count' => 'boolean',
         'hide_share_count' => 'boolean',
         'turn_off_commenting' => 'boolean',
@@ -31,14 +32,22 @@ class Post extends Model
     {
         return $this->hasMany(PostMedia::class)->orderBy('order');
     }
+
     public function comments()
     {
         return $this->hasMany(PostComment::class);
     }
+
+    public function reactions()
+    {
+        return $this->morphMany(Reaction::class, 'reactable');
+    }
+
     public function likes()
     {
-        return $this->hasMany(PostLike::class);
+        return $this->reactions();
     }
+
     public function postable()
     {
         return $this->morphTo();

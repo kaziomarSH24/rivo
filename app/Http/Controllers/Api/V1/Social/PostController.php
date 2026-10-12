@@ -23,7 +23,7 @@ class PostController extends Controller
     public function index(Request $request)
     {
         $posts = $this->postService->getAll(function ($query) {
-            $query->with(['user', 'pet', 'media', 'postable', 'likes'])->latest();
+            $query->with(['user', 'pet', 'media', 'postable', 'reactions'])->latest();
         });
 
         $resource = PostResource::collection($posts);
@@ -49,7 +49,7 @@ class PostController extends Controller
 
     public function show(Post $post)
     {
-        $post->load(['user', 'pet', 'media', 'comments.user', 'likes', 'postable']);
+        $post->load(['user', 'pet', 'media', 'comments.user', 'reactions', 'postable']);
         return response_success('Post retrieved successfully', new PostResource($post));
     }
 

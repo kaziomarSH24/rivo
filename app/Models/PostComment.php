@@ -27,4 +27,9 @@ class PostComment extends Model
     {
         return $this->hasMany(PostComment::class, 'parent_id')->with('user');
     }
+
+    public function reactions()
+    {
+        return $this->morphMany(Reaction::class, 'reactable');
+    }
 }
