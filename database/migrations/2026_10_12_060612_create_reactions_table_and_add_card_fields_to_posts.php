@@ -23,8 +23,6 @@ return new class extends Migration
             }
         });
 
-        Schema::dropIfExists('post_likes');
-
         Schema::create('reactions', function (Blueprint $table) {
             $table->id();
             $table->foreignId('user_id')->constrained()->cascadeOnDelete();
@@ -32,7 +30,7 @@ return new class extends Migration
             $table->string('reaction_type');
             $table->timestamps();
 
-            $table->unique(['user_id', 'reactable_type', 'reactable_id', 'reaction_type'], 'user_reactable_type_unique');
+            $table->unique(['user_id', 'reactable_type', 'reactable_id'], 'user_reactable_unique');
         });
     }
 
@@ -42,14 +40,6 @@ return new class extends Migration
     public function down(): void
     {
         Schema::dropIfExists('reactions');
-
-        Schema::create('post_likes', function (Blueprint $table) {
-            $table->id();
-            $table->foreignId('post_id')->constrained('posts')->cascadeOnDelete();
-            $table->foreignId('user_id')->constrained('users')->cascadeOnDelete();
-            $table->timestamps();
-            $table->unique(['post_id', 'user_id']);
-        });
 
         Schema::table('posts', function (Blueprint $table) {
             $table->dropColumn(['title', 'metadata', 'reaction_counts']);

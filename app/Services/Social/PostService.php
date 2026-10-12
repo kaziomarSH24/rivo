@@ -6,7 +6,6 @@ use App\Models\Post;
 use App\Models\Reaction;
 use App\Models\WalkSession;
 use App\Services\BaseService;
-use App\Notifications\PostLiked;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\DB;
 
@@ -138,13 +137,22 @@ class PostService extends BaseService
         $existing = Reaction::where('user_id', $userId)
             ->where('reactable_type', get_class($model))
             ->where('reactable_id', $model->id)
-            ->where('reaction_type', $reactionType)
             ->first();
 
         if ($existing) {
-            $existing->delete();
-            $status = 'unreacted';
+            if ($existing->reaction_type === $reactionType) {
+                // Same reaction tapped again -> unreact
+                $existing->delete();
+                $status = 'unreacted';
+                $userReaction = null;
+            } else {
+                // Different reaction tapped -> switch reaction (like Facebook)
+                $existing->update(['reaction_type' => $reactionType]);
+                $status = 'updated';
+                $userReaction = $reactionType;
+            }
         } else {
+            // First time reaction
             Reaction::create([
                 'user_id' => $userId,
                 'reactable_type' => get_class($model),
@@ -152,15 +160,24 @@ class PostService extends BaseService
                 'reaction_type' => $reactionType,
             ]);
             $status = 'reacted';
+            $userReaction = $reactionType;
         }
 
         // Recalculate summary counts for the model
-        $counts = Reaction::where('reactable_type', get_class($model))
+        $rawCounts = Reaction::where('reactable_type', get_class($model))
             ->where('reactable_id', $model->id)
             ->selectRaw('reaction_type, count(*) as count')
             ->groupBy('reaction_type')
             ->pluck('count', 'reaction_type')
             ->toArray();
+
+        $counts = [
+            'bone' => (int) ($rawCounts['bone'] ?? 0),
+            'fire' => (int) ($rawCounts['fire'] ?? 0),
+            'paw' => (int) ($rawCounts['paw'] ?? 0),
+            'heart' => (int) ($rawCounts['heart'] ?? 0),
+            'clap' => (int) ($rawCounts['clap'] ?? 0),
+        ];
 
         $totalLikes = array_sum($counts);
 
@@ -171,46 +188,12 @@ class PostService extends BaseService
             ]);
         }
 
-        $userReactions = Reaction::where('reactable_type', get_class($model))
-            ->where('reactable_id', $model->id)
-            ->where('user_id', $userId)
-            ->pluck('reaction_type')
-            ->toArray();
-
-        $reactionsPayload = [
-            'total' => $totalLikes,
-            'counts' => [
-                'bone' => (int) ($counts['bone'] ?? 0),
-                'fire' => (int) ($counts['fire'] ?? 0),
-                'paw' => (int) ($counts['paw'] ?? 0),
-                'heart' => (int) ($counts['heart'] ?? 0),
-                'clap' => (int) ($counts['clap'] ?? 0),
-            ],
-            'user_reactions' => $userReactions,
-            'user_has_boned' => in_array('bone', $userReactions),
-            'user_has_fired' => in_array('fire', $userReactions),
-            'user_has_pawed' => in_array('paw', $userReactions),
-            'user_has_hearted' => in_array('heart', $userReactions),
-            'user_has_clapped' => in_array('clap', $userReactions),
-        ];
-
         return [
             'status' => $status,
-            'reaction_type' => $reactionType,
-            'counts' => $counts,
-            'bones_count' => (int) ($counts['bone'] ?? 0),
-            'fires_count' => (int) ($counts['fire'] ?? 0),
-            'paws_count' => (int) ($counts['paw'] ?? 0),
-            'hearts_count' => (int) ($counts['heart'] ?? 0),
-            'claps_count' => (int) ($counts['clap'] ?? 0),
+            'user_reaction' => $userReaction,
+            'is_liked' => $userReaction !== null,
             'likes_count' => $totalLikes,
-            'reactions' => $reactionsPayload,
-            'user_reactions' => $userReactions,
-            'user_has_boned' => in_array('bone', $userReactions),
-            'user_has_fired' => in_array('fire', $userReactions),
-            'user_has_pawed' => in_array('paw', $userReactions),
-            'user_has_hearted' => in_array('heart', $userReactions),
-            'user_has_clapped' => in_array('clap', $userReactions),
+            'reactions' => $counts,
         ];
     }
 

@@ -27,28 +27,42 @@ class SocialReactionTest extends TestCase
 
         $response->assertStatus(200);
         $data = $response->json('data');
-        $this->assertArrayHasKey('reactions', $data);
-        $this->assertArrayHasKey('paw', $data['reactions']['counts']);
-        $this->assertTrue($data['reactions']['user_has_pawed']);
+        $this->assertEquals('reacted', $data['status']);
+        $this->assertEquals('paw', $data['user_reaction']);
+        $this->assertTrue($data['is_liked']);
+        $this->assertEquals(1, $data['reactions']['paw']);
+        $this->assertEquals(1, $data['likes_count']);
 
-        // 2. React again with paw (should toggle off)
+        // 2. React again with paw (should toggle off / unreact)
         $response2 = $this->actingAs($user, 'sanctum')->postJson("/api/v1/social/posts/{$post->id}/react", [
             'reaction_type' => 'paw',
         ]);
         $response2->assertStatus(200);
         $data2 = $response2->json('data');
-        $this->assertFalse($data2['reactions']['user_has_pawed']);
+        $this->assertEquals('unreacted', $data2['status']);
+        $this->assertNull($data2['user_reaction']);
+        $this->assertFalse($data2['is_liked']);
+        $this->assertEquals(0, $data2['reactions']['paw']);
+        $this->assertEquals(0, $data2['likes_count']);
 
-        // 3. React with heart and fire
+        // 3. React with heart
         $this->actingAs($user, 'sanctum')->postJson("/api/v1/social/posts/{$post->id}/react", [
             'reaction_type' => 'heart',
         ])->assertStatus(200);
 
-        $this->actingAs($user, 'sanctum')->postJson("/api/v1/social/posts/{$post->id}/react", [
+        // 4. Switch reaction to fire (Facebook model: replaces heart with fire)
+        $responseSwitch = $this->actingAs($user, 'sanctum')->postJson("/api/v1/social/posts/{$post->id}/react", [
             'reaction_type' => 'fire',
-        ])->assertStatus(200);
+        ]);
+        $responseSwitch->assertStatus(200);
+        $dataSwitch = $responseSwitch->json('data');
+        $this->assertEquals('updated', $dataSwitch['status']);
+        $this->assertEquals('fire', $dataSwitch['user_reaction']);
+        $this->assertEquals(1, $dataSwitch['reactions']['fire']);
+        $this->assertEquals(0, $dataSwitch['reactions']['heart']);
+        $this->assertEquals(1, $dataSwitch['likes_count']);
 
-        $this->assertDatabaseHas('reactions', [
+        $this->assertDatabaseMissing('reactions', [
             'user_id' => $user->id,
             'reactable_type' => Post::class,
             'reactable_id' => $post->id,
@@ -61,6 +75,15 @@ class SocialReactionTest extends TestCase
             'reactable_id' => $post->id,
             'reaction_type' => 'fire',
         ]);
+
+        // 5. Verify show endpoint returns user_reaction and is_liked
+        $showResponse = $this->actingAs($user, 'sanctum')->getJson("/api/v1/social/posts/{$post->id}");
+        $showResponse->assertStatus(200);
+        $showData = $showResponse->json('data');
+        $this->assertEquals('fire', $showData['user_reaction']);
+        $this->assertTrue($showData['is_liked']);
+        $this->assertEquals(1, $showData['reactions']['fire']);
+        $this->assertEquals(1, $showData['likes_count']);
     }
 
     public function test_backward_compatible_like_endpoint_defaults_to_bone(): void

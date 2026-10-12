@@ -16,19 +16,29 @@ class PostResource extends JsonResource
 
         $counts = $this->reaction_counts ?? [];
         if (empty($counts) && $this->relationLoaded('reactions')) {
-            $counts = $this->reactions->groupBy('reaction_type')->map->count()->toArray();
+            $raw = $this->reactions->groupBy('reaction_type')->map->count()->toArray();
+            $counts = [
+                'bone' => (int) ($raw['bone'] ?? 0),
+                'fire' => (int) ($raw['fire'] ?? 0),
+                'paw' => (int) ($raw['paw'] ?? 0),
+                'heart' => (int) ($raw['heart'] ?? 0),
+                'clap' => (int) ($raw['clap'] ?? 0),
+            ];
+        } else {
+            $counts = [
+                'bone' => (int) ($counts['bone'] ?? 0),
+                'fire' => (int) ($counts['fire'] ?? 0),
+                'paw' => (int) ($counts['paw'] ?? 0),
+                'heart' => (int) ($counts['heart'] ?? 0),
+                'clap' => (int) ($counts['clap'] ?? 0),
+            ];
         }
 
-        $userReactions = [];
+        $userReaction = null;
         if ($userId && $this->relationLoaded('reactions')) {
-            $userReactions = $this->reactions->where('user_id', $userId)->pluck('reaction_type')->values()->toArray();
+            $userReaction = $this->reactions->firstWhere('user_id', $userId)?->reaction_type;
         }
 
-        $bonesCount = (int) ($counts['bone'] ?? 0);
-        $firesCount = (int) ($counts['fire'] ?? 0);
-        $pawsCount = (int) ($counts['paw'] ?? 0);
-        $heartsCount = (int) ($counts['heart'] ?? 0);
-        $clapsCount = (int) ($counts['clap'] ?? 0);
         $totalLikes = (int) ($this->likes_count ?: array_sum($counts));
 
         return [
@@ -42,30 +52,11 @@ class PostResource extends JsonResource
             'hide_share_count' => (bool) $this->hide_share_count,
             'turn_off_commenting' => (bool) $this->turn_off_commenting,
             'likes_count' => $totalLikes,
-            'bones_count' => $bonesCount,
-            'fires_count' => $firesCount,
-            'paws_count' => $pawsCount,
-            'hearts_count' => $heartsCount,
-            'claps_count' => $clapsCount,
-            'reactions' => [
-                'total' => $totalLikes,
-                'counts' => [
-                    'bone' => $bonesCount,
-                    'fire' => $firesCount,
-                    'paw' => $pawsCount,
-                    'heart' => $heartsCount,
-                    'clap' => $clapsCount,
-                ],
-                'user_reactions' => $userReactions,
-                'user_has_boned' => in_array('bone', $userReactions),
-                'user_has_fired' => in_array('fire', $userReactions),
-                'user_has_pawed' => in_array('paw', $userReactions),
-                'user_has_hearted' => in_array('heart', $userReactions),
-                'user_has_clapped' => in_array('clap', $userReactions),
-            ],
+            'is_liked' => $userReaction !== null,
+            'user_reaction' => $userReaction,
+            'reactions' => $counts,
             'comments_count' => (int) $this->comments_count,
             'shares_count' => (int) $this->shares_count,
-            'is_liked' => !empty($userReactions),
             'created_at' => $this->created_at,
             'updated_at' => $this->updated_at,
             'user' => new UserResource($this->whenLoaded('user')),

@@ -19,11 +19,6 @@ return new class extends Migration
             $table->unsignedInteger('order')->default(0)->after('thumbnail_path');
         });
 
-        Schema::table('post_likes', function (Blueprint $table) {
-            $table->foreignId('post_id')->after('id')->constrained('posts')->cascadeOnDelete();
-            $table->foreignId('user_id')->after('post_id')->constrained('users')->cascadeOnDelete();
-            $table->unique(['post_id', 'user_id']);
-        });
 
         Schema::table('post_comments', function (Blueprint $table) {
             $table->foreignId('post_id')->after('id')->constrained('posts')->cascadeOnDelete();
@@ -43,12 +38,6 @@ return new class extends Migration
             $table->dropColumn(['post_id', 'user_id', 'content']);
         });
 
-        Schema::table('post_likes', function (Blueprint $table) {
-            $table->dropForeign(['post_id']);
-            $table->dropForeign(['user_id']);
-            $table->dropUnique(['post_id', 'user_id']);
-            $table->dropColumn(['post_id', 'user_id']);
-        });
 
         Schema::table('post_media', function (Blueprint $table) {
             $table->dropForeign(['post_id']);

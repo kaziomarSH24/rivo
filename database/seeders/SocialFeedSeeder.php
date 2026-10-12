@@ -209,7 +209,7 @@ class SocialFeedSeeder extends Seeder
             'created_at' => now()->subHours(2),
         ]);
 
-        // 6. User Omar reactions
+        // 6. User reactions (1 reaction per user per post/comment)
         Reaction::create([
             'user_id' => $omar->id,
             'reactable_type' => Post::class,
@@ -220,8 +220,8 @@ class SocialFeedSeeder extends Seeder
         Reaction::create([
             'user_id' => $omar->id,
             'reactable_type' => Post::class,
-            'reactable_id' => $post1->id,
-            'reaction_type' => 'heart',
+            'reactable_id' => $post2->id,
+            'reaction_type' => 'fire',
         ]);
 
         // Comment reaction (heart on Elena's comment)
