@@ -30,6 +30,7 @@ class Pet extends Model
         'energy_level',
         'training_level',
         'is_vaccinated',
+        'displayed_badges',
     ];
 
     protected $casts = [
@@ -37,11 +38,17 @@ class Pet extends Model
         'is_vaccinated' => 'boolean',
         'traits' => 'array',
         'personality' => 'array',
+        'displayed_badges' => 'array',
     ];
 
     public function user(): BelongsTo
     {
         return $this->belongsTo(User::class);
+    }
+
+    public function posts(): HasMany
+    {
+        return $this->hasMany(Post::class);
     }
 
     public function lostReports()
@@ -84,9 +91,3 @@ class Pet extends Model
         return $this->hasMany(HealthDocument::class);
     }
 }
-
-
-
-
-
-

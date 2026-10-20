@@ -9,85 +9,29 @@ use App\Models\Post;
 use App\Models\WalkSession;
 use App\Models\Reaction;
 use App\Models\PostComment;
-use Illuminate\Support\Facades\Hash;
+use Carbon\Carbon;
 
 class SocialFeedSeeder extends Seeder
 {
     public function run(): void
     {
-        // 1. Ensure users exist
-        $sarah = User::firstOrCreate(
-            ['email' => 'sarah@yopmail.com'],
-            [
-                'name' => 'Sarah M.',
-                'password' => Hash::make('11111111'),
-                'latitude' => 23.8153,
-                'longitude' => 90.4175,
-                'email_verified_at' => now(),
-            ]
-        );
+        // 1. Fetch Users
+        $omar = User::where('email', 'kaziomar@yopmail.com')->first();
+        $sarah = User::where('email', 'sarah@yopmail.com')->first();
+        $james = User::where('email', 'james@yopmail.com')->first();
+        $elena = User::where('email', 'elena@yopmail.com')->first();
+        $david = User::where('email', 'david@yopmail.com')->first();
+        $alex = User::where('email', 'alex@yopmail.com')->first();
 
-        $james = User::firstOrCreate(
-            ['email' => 'james@yopmail.com'],
-            [
-                'name' => 'James K.',
-                'password' => Hash::make('11111111'),
-                'latitude' => 23.8223,
-                'longitude' => 90.4225,
-                'email_verified_at' => now(),
-            ]
-        );
+        if (!$omar || !$sarah) {
+            return;
+        }
 
-        $elena = User::firstOrCreate(
-            ['email' => 'elena@yopmail.com'],
-            [
-                'name' => 'Elena R.',
-                'password' => Hash::make('11111111'),
-                'latitude' => 23.7503,
-                'longitude' => 90.3925,
-                'email_verified_at' => now(),
-            ]
-        );
+        // Fetch Pets
+        $pedro = Pet::where('user_id', $omar->id)->where('name', 'Pedro')->first();
+        $luna = Pet::where('user_id', $sarah->id)->where('name', 'Luna')->first();
 
-        $omar = User::firstOrCreate(
-            ['email' => 'kaziomar@yopmail.com'],
-            [
-                'name' => 'Omar Faruk',
-                'password' => Hash::make('11111111'),
-                'latitude' => 23.8103,
-                'longitude' => 90.4125,
-                'email_verified_at' => now(),
-            ]
-        );
-
-        // 2. Ensure pets exist
-        $luna = Pet::firstOrCreate(
-            ['user_id' => $sarah->id, 'name' => 'Luna'],
-            [
-                'type' => 'Dog',
-                'breed' => 'Golden Retriever',
-                'gender' => 'female',
-                'age_years' => 3,
-                'age_months' => 0,
-                'weight' => 28,
-                'bio' => 'Friendly and energetic - loves long sunrise walks.',
-            ]
-        );
-
-        $pedro = Pet::firstOrCreate(
-            ['user_id' => $james->id, 'name' => 'Pedro'],
-            [
-                'type' => 'Dog',
-                'breed' => 'Golden Retriever',
-                'gender' => 'male',
-                'age_years' => 2,
-                'age_months' => 3,
-                'weight' => 32,
-                'bio' => 'Adventure buddy who loves hiking and trail running.',
-            ]
-        );
-
-        // 3. Card 1: Luna's Sunrise Walk (Walk Post)
+        // 2. Card 1: Luna's Sunrise Walk (Walk Summary Post)
         $lunaWalk = WalkSession::create([
             'pet_id' => $luna->id,
             'distance_km' => 4.20,
@@ -95,8 +39,8 @@ class SocialFeedSeeder extends Seeder
             'avg_speed_kmh' => 4.85,
             'steps' => 5400,
             'calories' => 280,
-            'start_time' => now()->subMinutes(70),
-            'end_time' => now()->subMinutes(18),
+            'start_time' => Carbon::now()->subMinutes(70),
+            'end_time' => Carbon::now()->subMinutes(18),
             'route_coordinates' => [
                 ['lat' => 23.8103, 'lng' => 90.4125],
                 ['lat' => 23.8120, 'lng' => 90.4140],
@@ -125,26 +69,34 @@ class SocialFeedSeeder extends Seeder
                 'clap' => 3,
             ],
             'comments_count' => 2,
-            'created_at' => now()->subMinutes(18),
+            'created_at' => Carbon::now()->subMinutes(18),
         ]);
 
         $comment1 = PostComment::create([
             'post_id' => $post1->id,
-            'user_id' => $elena->id,
+            'user_id' => $elena ? $elena->id : $sarah->id,
             'content' => "So cute! Love Luna's energy in the morning 😍",
-            'created_at' => now()->subMinutes(10),
+            'created_at' => Carbon::now()->subMinutes(12),
         ]);
 
-        $comment2 = PostComment::create([
+        PostComment::create([
             'post_id' => $post1->id,
-            'user_id' => $james->id,
-            'content' => 'Great pace! Perfect weather for a long walk 🐾',
-            'created_at' => now()->subMinutes(5),
+            'user_id' => $james ? $james->id : $sarah->id,
+            'content' => "Great pace! Perfect weather for a long walk 🐾",
+            'created_at' => Carbon::now()->subMinutes(6),
         ]);
 
-        // 4. Card 2: Pedro's Trail Runner (Achievement Post)
+        // Omar reacts with 'bone' on Luna's walk post
+        Reaction::create([
+            'user_id' => $omar->id,
+            'reactable_type' => Post::class,
+            'reactable_id' => $post1->id,
+            'reaction_type' => 'bone',
+        ]);
+
+        // 3. Card 2: Pedro's Trail Runner Achievement Post
         $post2 = Post::create([
-            'user_id' => $james->id,
+            'user_id' => $omar->id,
             'pet_id' => $pedro->id,
             'title' => 'Pedro earned Trail Runner',
             'content' => 'So proud - 50 km of trails completed 🎉',
@@ -155,10 +107,10 @@ class SocialFeedSeeder extends Seeder
                 'badge_name' => 'Trail Runner',
                 'badge_level' => 'Level 2',
                 'badge_icon' => 'medal_bronze_paw',
-                'bonus_xp' => 200,
                 'total_walks' => 58,
-                'distance_km' => 50.0,
+                'distance_km' => 50,
                 'xp_earned' => 200,
+                'bonus_xp' => 200,
             ],
             'likes_count' => 96,
             'reaction_counts' => [
@@ -169,20 +121,28 @@ class SocialFeedSeeder extends Seeder
                 'clap' => 15,
             ],
             'comments_count' => 1,
-            'created_at' => now()->subHour(),
+            'created_at' => Carbon::now()->subHours(1),
         ]);
 
         PostComment::create([
             'post_id' => $post2->id,
-            'user_id' => $sarah->id,
-            'content' => 'Way to go Pedro!! Amazing accomplishment 🏆',
-            'created_at' => now()->subMinutes(30),
+            'user_id' => $james ? $james->id : $sarah->id,
+            'content' => "Way to go Pedro!! Amazing accomplishment 🏆",
+            'created_at' => Carbon::now()->subMinutes(45),
         ]);
 
-        // 5. Card 3: Pedro's 7-Day Walk Streak (Milestone Post)
-        $post3 = Post::create([
+        // Sarah reacts with 'fire' on Pedro's achievement
+        Reaction::create([
             'user_id' => $sarah->id,
-            'pet_id' => $luna->id,
+            'reactable_type' => Post::class,
+            'reactable_id' => $post2->id,
+            'reaction_type' => 'fire',
+        ]);
+
+        // 4. Card 3: Pedro's 7-Day Walk Streak Milestone Post
+        $post3 = Post::create([
+            'user_id' => $omar->id,
+            'pet_id' => $pedro->id,
             'title' => 'Pedro reached a 7-day walk streak! 🔥',
             'content' => 'Consistency is key! Keeping up the daily routine with my favorite buddy 🐾',
             'type' => 'milestone',
@@ -192,10 +152,10 @@ class SocialFeedSeeder extends Seeder
                 'badge_name' => 'Walk Streak',
                 'badge_level' => 'Level 2',
                 'badge_icon' => 'medal_bronze_paw',
-                'bonus_xp' => 200,
                 'streak_days' => 7,
-                'total_walks' => 7,
                 'total_km' => 28.4,
+                'total_walks' => 7,
+                'bonus_xp' => 200,
             ],
             'likes_count' => 176,
             'reaction_counts' => [
@@ -206,25 +166,65 @@ class SocialFeedSeeder extends Seeder
                 'clap' => 30,
             ],
             'comments_count' => 0,
-            'created_at' => now()->subHours(2),
+            'created_at' => Carbon::now()->subHours(2),
         ]);
 
-        // 6. User reactions (1 reaction per user per post/comment)
-        Reaction::create([
+        if ($james) {
+            Reaction::create([
+                'user_id' => $james->id,
+                'reactable_type' => Post::class,
+                'reactable_id' => $post3->id,
+                'reaction_type' => 'paw',
+            ]);
+        }
+
+        // 5. Card 4: Omar's Park Photo / Agility Training Post
+        $post4 = Post::create([
             'user_id' => $omar->id,
-            'reactable_type' => Post::class,
-            'reactable_id' => $post1->id,
-            'reaction_type' => 'bone',
+            'pet_id' => $pedro->id,
+            'title' => 'Weekend agility training',
+            'content' => 'Pedro mastered the obstacle course today! Hard work and treats always pay off 🐶⚡',
+            'type' => 'general',
+            'location' => 'Dhaka Agility Park',
+            'visibility' => 'public',
+            'likes_count' => 42,
+            'reaction_counts' => [
+                'bone' => 20,
+                'fire' => 12,
+                'paw' => 4,
+                'heart' => 4,
+                'clap' => 2,
+            ],
+            'comments_count' => 2,
+            'created_at' => Carbon::now()->subHours(4),
         ]);
 
-        Reaction::create([
-            'user_id' => $omar->id,
-            'reactable_type' => Post::class,
-            'reactable_id' => $post2->id,
-            'reaction_type' => 'fire',
+        if ($elena) {
+            Reaction::create([
+                'user_id' => $elena->id,
+                'reactable_type' => Post::class,
+                'reactable_id' => $post4->id,
+                'reaction_type' => 'heart',
+            ]);
+        }
+
+        PostComment::create([
+            'post_id' => $post4->id,
+            'user_id' => $sarah->id,
+            'content' => "He is so fast and agile! Great form 🐕",
+            'created_at' => Carbon::now()->subHours(3),
         ]);
 
-        // Comment reaction (heart on Elena's comment)
+        if ($david) {
+            PostComment::create([
+                'post_id' => $post4->id,
+                'user_id' => $david->id,
+                'content' => "What a champion! Pedro is getting stronger every week.",
+                'created_at' => Carbon::now()->subHours(2)->subMinutes(30),
+            ]);
+        }
+
+        // 6. Comment reaction (Omar heart on Elena's comment)
         Reaction::create([
             'user_id' => $omar->id,
             'reactable_type' => PostComment::class,

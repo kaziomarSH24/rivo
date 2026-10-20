@@ -70,9 +70,7 @@ class PetController extends Controller
      */
     public function show(Pet $pet, Request $request)
     {
-        if ($pet->user_id !== $request->user()->id) {
-            return response_error('Unauthorized access to pet', [], 403);
-        }
+        $pet->load(['user', 'walkStats']);
 
         return response_success('Pet retrieved successfully', new PetResource($pet));
     }
@@ -103,6 +101,7 @@ class PetController extends Controller
         return response_success('Pet deleted successfully');
     }
 }
+
 
 
 

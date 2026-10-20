@@ -48,8 +48,20 @@ class Post extends Model
         return $this->reactions();
     }
 
-    public function postable()
+        public function postable()
     {
         return $this->morphTo();
     }
+
+    public function bookmarks()
+    {
+        return $this->hasMany(PostBookmark::class);
+    }
+
+    public function isBookmarkedBy(?User $user): bool
+    {
+        if (!$user) return false;
+        return $this->bookmarks()->where('user_id', $user->id)->exists();
+    }
 }
+

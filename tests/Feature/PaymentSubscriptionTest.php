@@ -11,7 +11,7 @@ use Tests\TestCase;
 
 class PaymentSubscriptionTest extends TestCase
 {
-    use RefreshDatabase;
+    use \Illuminate\Foundation\Testing\DatabaseTransactions;
 
     /**
      * Best Practice: Test that an authenticated user can create a subscription checkout session.
@@ -104,4 +104,5 @@ class PaymentSubscriptionTest extends TestCase
         ]);
     }
 }
+
 

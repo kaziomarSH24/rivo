@@ -12,7 +12,7 @@ class HealthVaultSeeder extends Seeder
 {
     public function run(): void
     {
-        $pet = Pet::first();
+        $pet = Pet::where('name', 'Pedro')->first() ?? Pet::first();
         if (!$pet) {
             return;
         }

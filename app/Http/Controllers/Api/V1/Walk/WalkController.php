@@ -58,13 +58,9 @@ class WalkController extends Controller
     /**
      * Show a specific walk session
      */
-    public function show(Pet $pet, WalkSession $walk)
+    public function show(WalkSession $walk)
     {
-        Gate::authorize('view', $pet);
-        
-        if ($walk->pet_id !== $pet->id) {
-            return response_error('Walk session does not belong to this pet', 403);
-        }
+        Gate::authorize('view', $walk->pet);
 
         $walk->load(['pet', 'route']);
 
@@ -98,6 +94,11 @@ class WalkController extends Controller
     /**
      * Get Pet Walk Goals and Streak
      */
+    public function getStats(Pet $pet)
+    {
+        return $this->stats($pet);
+    }
+
     public function stats(Pet $pet)
     {
         Gate::authorize('view', $pet);

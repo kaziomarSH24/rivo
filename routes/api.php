@@ -66,7 +66,13 @@ Route::middleware(['auth:sanctum', 'throttle:api'])->prefix('v1')->name('api.v1.
     });
 
     // --- Core Features ---
-    Route::apiResource('pets', PetController::class);
+        Route::apiResource('pets', PetController::class);
+
+    // --- Pet Badges (Achievements) ---
+    Route::controller(\App\Http\Controllers\Api\V1\Pet\PetBadgeController::class)->prefix('pets/{pet}/badges')->group(function () {
+        Route::get('/', 'index');
+        Route::post('display', 'display');
+    });
 
     // --- Care Module ---
     Route::apiResource('pets.care-tasks', CareController::class)->only(['index', 'store']);
@@ -214,6 +220,10 @@ Route::middleware(['auth:sanctum', 'throttle:api'])->prefix('v1')->name('api.v1.
         Route::post('request/send/{pet}', [\App\Http\Controllers\Api\V1\Social\ConnectionController::class, 'sendRequest']);
         Route::post('request/respond/{pet}', [\App\Http\Controllers\Api\V1\Social\ConnectionController::class, 'respond']);
 
+                // Saved Posts / Bookmarks
+        Route::get('posts/saved', [\App\Http\Controllers\Api\V1\Social\PostBookmarkController::class, 'index']);
+        Route::post('posts/{post}/bookmark', [\App\Http\Controllers\Api\V1\Social\PostBookmarkController::class, 'toggle']);
+
         // Social Feed & Posts
         Route::apiResource('posts', \App\Http\Controllers\Api\V1\Social\PostController::class);
         Route::post('posts/{post}/like', [\App\Http\Controllers\Api\V1\Social\PostController::class, 'toggleLike']);
@@ -230,6 +240,7 @@ Route::middleware(['auth:sanctum', 'throttle:api'])->prefix('v1')->name('api.v1.
 Route::fallback(function () {
     return response_error('The requested API endpoint does not exist.', [], 404);
 });
+
 
 
 

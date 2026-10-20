@@ -13,7 +13,7 @@ class SmartAlertSeeder extends Seeder
     public function run(): void
     {
         // Get the first pet to seed data for
-        $pet = Pet::first();
+        $pet = Pet::where('name', 'Pedro')->first() ?? Pet::first();
         if (!$pet) {
             $this->command->warn('No pets found to seed smart alert data. Run DatabaseSeeder first.');
             return;

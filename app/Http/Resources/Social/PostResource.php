@@ -52,7 +52,8 @@ class PostResource extends JsonResource
             'hide_share_count' => (bool) $this->hide_share_count,
             'turn_off_commenting' => (bool) $this->turn_off_commenting,
             'likes_count' => $totalLikes,
-            'is_liked' => $userReaction !== null,
+                        'is_liked' => $userReaction !== null,
+            'is_bookmarked' => $userId ? $this->isBookmarkedBy($request->user()) : false,
             'user_reaction' => $userReaction,
             'reactions' => $counts,
             'comments_count' => (int) $this->comments_count,
@@ -85,3 +86,4 @@ class PostResource extends JsonResource
         ];
     }
 }
+

@@ -123,10 +123,16 @@ class User extends Authenticatable
         return $this->belongsTo(Plan::class);
     }
 
+        public function bookmarkedPosts(): BelongsToMany
+    {
+        return $this->belongsToMany(Post::class, 'post_bookmarks')->withTimestamps();
+    }
+
     public function conversations(): BelongsToMany
     {
         return $this->belongsToMany(Conversation::class)->withPivot('role');
     }
 }
+
 
 

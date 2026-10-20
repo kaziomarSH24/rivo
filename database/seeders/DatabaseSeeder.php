@@ -21,7 +21,14 @@ class DatabaseSeeder extends Seeder
         // ]);
         $this->call([
             RolesAndPermissionsSeeder::class,
-            // Add other seeders here as needed
+            PlanSeeder::class,
+            WalkRewardSeeder::class,
+            PetSocialSeeder::class,
+            WalkSessionSeeder::class,
+            CareSeeder::class,
+            HealthVaultSeeder::class,
+            SmartAlertSeeder::class,
+            SocialFeedSeeder::class,
         ]);
     }
 }
