@@ -85,7 +85,7 @@ class AuthService
         return [
             'access_token' => $token,
             'token_type' => 'Bearer',
-            'user' => $user->load('roles', 'permissions'),
+            'user' => $user->load(['roles', 'permissions', 'store']),
         ];
     }
 
@@ -135,7 +135,7 @@ class AuthService
         return [
             'access_token' => $authToken,
             'token_type' => 'Bearer',
-            'user' => $user->load('roles', 'permissions'),
+            'user' => $user->load(['roles', 'permissions', 'store']),
         ];
     }
 
@@ -173,7 +173,7 @@ class AuthService
         return [
             'access_token' => $token,
             'token_type' => 'Bearer',
-            'user' => $user,
+            'user' => $user->load(['roles', 'permissions', 'store']),
         ];
     }
 

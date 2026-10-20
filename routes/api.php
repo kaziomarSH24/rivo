@@ -232,6 +232,77 @@ Route::middleware(['auth:sanctum', 'throttle:api'])->prefix('v1')->name('api.v1.
         Route::post('posts/{post}/comments', [\App\Http\Controllers\Api\V1\Social\PostCommentController::class, 'store']);
         Route::delete('posts/{post}/comments/{comment}', [\App\Http\Controllers\Api\V1\Social\PostCommentController::class, 'destroy']);
     });
+
+    // ==========================================
+    // VENDOR / MERCHANT PORTAL MODULE
+    // ==========================================
+    Route::prefix('vendor')->group(function () {
+        // Store Onboarding & Profile
+        Route::post('store', [\App\Http\Controllers\Api\V1\Vendor\VendorStoreController::class, 'store']);
+        Route::get('profile', [\App\Http\Controllers\Api\V1\Vendor\VendorStoreController::class, 'profile']);
+        Route::post('profile', [\App\Http\Controllers\Api\V1\Vendor\VendorStoreController::class, 'updateProfile']);
+        Route::post('documents', [\App\Http\Controllers\Api\V1\Vendor\VendorStoreController::class, 'uploadDocument']);
+        Route::delete('documents/{document}', [\App\Http\Controllers\Api\V1\Vendor\VendorStoreController::class, 'deleteDocument']);
+        Route::get('dashboard', [\App\Http\Controllers\Api\V1\Vendor\VendorStoreController::class, 'dashboard']);
+        Route::get('analytics', [\App\Http\Controllers\Api\V1\Vendor\VendorStoreController::class, 'analytics']);
+
+        // Catalog & 4-Step Product Wizard
+        Route::get('products', [\App\Http\Controllers\Api\V1\Vendor\VendorProductController::class, 'index']);
+        Route::post('products', [\App\Http\Controllers\Api\V1\Vendor\VendorProductController::class, 'store']);
+        Route::get('products/{product}', [\App\Http\Controllers\Api\V1\Vendor\VendorProductController::class, 'show']);
+        Route::post('products/{product}', [\App\Http\Controllers\Api\V1\Vendor\VendorProductController::class, 'update']);
+        Route::patch('products/{product}/stock', [\App\Http\Controllers\Api\V1\Vendor\VendorProductController::class, 'updateStock']);
+        Route::patch('products/{product}/toggle-active', [\App\Http\Controllers\Api\V1\Vendor\VendorProductController::class, 'toggleActive']);
+        Route::delete('products/{product}', [\App\Http\Controllers\Api\V1\Vendor\VendorProductController::class, 'destroy']);
+
+        // Order Management & Fulfillment Stepper
+        Route::get('orders', [\App\Http\Controllers\Api\V1\Vendor\VendorOrderController::class, 'index']);
+        Route::get('orders/{order}', [\App\Http\Controllers\Api\V1\Vendor\VendorOrderController::class, 'show']);
+        Route::post('orders/{order}/accept', [\App\Http\Controllers\Api\V1\Vendor\VendorOrderController::class, 'accept']);
+        Route::post('orders/{order}/reject', [\App\Http\Controllers\Api\V1\Vendor\VendorOrderController::class, 'reject']);
+        Route::patch('orders/{order}/status', [\App\Http\Controllers\Api\V1\Vendor\VendorOrderController::class, 'updateStatus']);
+    });
+
+    // ==========================================
+    // MARKETPLACE (CUSTOMER) MODULE
+    // ==========================================
+    Route::prefix('marketplace')->group(function () {
+        // Discovery & Catalog
+        Route::get('home', [\App\Http\Controllers\Api\V1\Marketplace\MarketplaceHomeController::class, 'index']);
+        Route::get('stores', [\App\Http\Controllers\Api\V1\Marketplace\MarketplaceHomeController::class, 'stores']);
+        Route::get('categories', [\App\Http\Controllers\Api\V1\Marketplace\MarketplaceHomeController::class, 'categories']);
+        Route::get('categories/{category}/products', [\App\Http\Controllers\Api\V1\Marketplace\MarketplaceHomeController::class, 'categoryProducts']);
+        Route::get('products', [\App\Http\Controllers\Api\V1\Marketplace\MarketplaceHomeController::class, 'products']);
+        Route::get('search', [\App\Http\Controllers\Api\V1\Marketplace\MarketplaceHomeController::class, 'search']);
+        Route::delete('search/recent', [\App\Http\Controllers\Api\V1\Marketplace\MarketplaceHomeController::class, 'clearRecentSearches']);
+        Route::get('stores/{store}', [\App\Http\Controllers\Api\V1\Marketplace\MarketplaceHomeController::class, 'storeProfile']);
+        Route::get('products/{product}', [\App\Http\Controllers\Api\V1\Marketplace\MarketplaceHomeController::class, 'productDetails']);
+
+        // Reviews
+        Route::post('reviews', [\App\Http\Controllers\Api\V1\Marketplace\ReviewController::class, 'store']);
+        Route::get('products/{product}/reviews', [\App\Http\Controllers\Api\V1\Marketplace\ReviewController::class, 'productReviews']);
+        Route::get('stores/{store}/reviews', [\App\Http\Controllers\Api\V1\Marketplace\ReviewController::class, 'storeReviews']);
+
+        // Delivery Addresses
+        Route::get('addresses', [\App\Http\Controllers\Api\V1\Marketplace\UserAddressController::class, 'index']);
+        Route::post('addresses', [\App\Http\Controllers\Api\V1\Marketplace\UserAddressController::class, 'store']);
+        Route::put('addresses/{address}', [\App\Http\Controllers\Api\V1\Marketplace\UserAddressController::class, 'update']);
+        Route::patch('addresses/{address}/default', [\App\Http\Controllers\Api\V1\Marketplace\UserAddressController::class, 'setDefault']);
+        Route::delete('addresses/{address}', [\App\Http\Controllers\Api\V1\Marketplace\UserAddressController::class, 'destroy']);
+
+        // Cart
+        Route::get('cart', [\App\Http\Controllers\Api\V1\Marketplace\CartController::class, 'index']);
+        Route::post('cart/items', [\App\Http\Controllers\Api\V1\Marketplace\CartController::class, 'addItem']);
+        Route::patch('cart/items/{item}', [\App\Http\Controllers\Api\V1\Marketplace\CartController::class, 'updateItem']);
+        Route::delete('cart/items/{item}', [\App\Http\Controllers\Api\V1\Marketplace\CartController::class, 'removeItem']);
+        Route::delete('cart', [\App\Http\Controllers\Api\V1\Marketplace\CartController::class, 'clear']);
+
+        // Checkout & Orders
+        Route::post('checkout', [\App\Http\Controllers\Api\V1\Marketplace\CheckoutController::class, 'process']);
+        Route::get('orders', [\App\Http\Controllers\Api\V1\Marketplace\CustomerOrderController::class, 'index']);
+        Route::get('orders/{order}', [\App\Http\Controllers\Api\V1\Marketplace\CustomerOrderController::class, 'show']);
+        Route::post('orders/{order}/cancel', [\App\Http\Controllers\Api\V1\Marketplace\CustomerOrderController::class, 'cancel']);
+    });
 });
 
 // ==========================================

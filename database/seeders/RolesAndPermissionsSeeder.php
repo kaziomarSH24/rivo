@@ -29,7 +29,10 @@ class RolesAndPermissionsSeeder extends Seeder
         // The Admin role
         Role::findOrCreate('admin');
 
-        // Role for regular users
+        // Role for regular pet owner users
         Role::findOrCreate('user');
+
+        // Role for store owners / service providers
+        Role::findOrCreate('vendor');
     }
 }
