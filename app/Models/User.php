@@ -157,4 +157,18 @@ class User extends Authenticatable
     {
         return $this->hasMany(Review::class);
     }
+    /**
+     * Determine if user has an active premium subscription (Plus or Pro).
+     */
+    public function isPro(): bool
+    {
+        if ($this->plan_id > 1) {
+            if ($this->subscription_expires_at && now()->greaterThan($this->subscription_expires_at)) {
+                return false;
+            }
+            return true;
+        }
+
+        return false;
+    }
 }

@@ -31,7 +31,7 @@ class SubscriptionController extends Controller
             'ok' => true,
             'data' => [
                 'plan' => $user->plan,
-                'is_pro' => $user->plan_id > 1,
+                'is_pro' => $user->isPro(),
                 'expires_at' => $user->subscription_expires_at
             ]
         ]);

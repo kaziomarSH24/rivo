@@ -48,7 +48,7 @@ class CartService extends BaseService
         }
 
         // Delivery fee: Free for Rivo Pro users or if subtotal is 0
-        $isPro = (bool) ($user->plan_id || $user->hasRole('pro'));
+        $isPro = $user->isPro();
         $deliveryFee = ($subtotal > 0 && !$isPro && $cart->store) ? (float) $cart->store->delivery_fee : 0.0;
 
         $discount = (float) $cart->discount_amount;
