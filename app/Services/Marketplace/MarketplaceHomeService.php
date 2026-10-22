@@ -32,7 +32,13 @@ class MarketplaceHomeService
         // 2. Active Pet for personalized recommendations
         $activePet = null;
         if ($user) {
-            $activePet = Pet::where('user_id', $user->id)->first();
+            $requestedPetId = request()->query('pet_id');
+            if ($requestedPetId) {
+                $activePet = Pet::where('user_id', $user->id)->where('id', $requestedPetId)->first();
+            }
+            if (!$activePet) {
+                $activePet = Pet::where('user_id', $user->id)->first();
+            }
         }
 
         // 3. Categories with active product counts
