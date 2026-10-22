@@ -45,6 +45,7 @@ class MarketplaceHomeService
         // 4. Popular Stores near user
         $popularStores = Store::where('is_live', true)
             ->where('is_verified', true)
+            ->where('verification_status', 'verified')
             ->orderByDesc('rating')
             ->orderByDesc('reviews_count')
             ->limit(6)

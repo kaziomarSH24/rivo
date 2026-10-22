@@ -100,6 +100,7 @@ class MarketplaceSeeder extends Seeder
                 'delivery_fee' => 0.00,
                 'delivery_time_text' => '15-20 min',
                 'is_verified' => true,
+                'verification_status' => 'verified',
                 'is_live' => true,
                 
             ]
@@ -137,6 +138,7 @@ class MarketplaceSeeder extends Seeder
                 'delivery_fee' => 0.00,
                 'delivery_time_text' => '15 min',
                 'is_verified' => true,
+                'verification_status' => 'verified',
                 'is_live' => true,
                 
             ]
@@ -162,6 +164,7 @@ class MarketplaceSeeder extends Seeder
                 'delivery_fee' => 2.99,
                 'delivery_time_text' => '25 min',
                 'is_verified' => true,
+                'verification_status' => 'verified',
                 'is_live' => true,
                 
             ]
