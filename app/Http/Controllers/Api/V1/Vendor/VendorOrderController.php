@@ -45,7 +45,7 @@ class VendorOrderController extends Controller
             return response_error('Unauthorized access to this order.', [], 403);
         }
 
-        $order->load(['user:id,name,email,avatar', 'items', 'address']);
+        $order->load(['user:id,name,email,avatar', 'items', 'address', 'transaction']);
 
         return response_success('Order details retrieved successfully.', $order);
     }
@@ -99,7 +99,7 @@ class VendorOrderController extends Controller
         }
 
         try {
-            $updated = $this->orderService->updateFulfillmentStatus($store, $order, $request->input('status'));
+            $updated = $this->orderService->updateFulfillmentStatus($store, $order, $request->input('status'), $request->input('reason'));
             return response_success('Order fulfillment status updated successfully.', $updated);
         } catch (\Exception $e) {
             return response_error($e->getMessage(), [], 422);

@@ -44,6 +44,10 @@ class CheckoutController extends Controller
      */
     public function confirmPayment(Request $request, Order $order): JsonResponse
     {
+        if ($order->user_id !== $request->user()->id) {
+            return response_error('Unauthorized access to this order.', [], 403);
+        }
+
         try {
             $result = $this->orderService->confirmOrderPayment(
                 $request->user(),

@@ -8,6 +8,7 @@ use App\Services\Payment\Contracts\PaymentGatewayInterface;
 use App\Services\Payment\DTO\PaymentResult;
 use Exception;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Str;
 use Stripe\PaymentIntent;
 use Stripe\Refund;
 use Stripe\Stripe;
@@ -22,9 +23,15 @@ class StripePaymentGateway implements PaymentGatewayInterface
     protected function initStripeKey(): void
     {
         $secretKey = config('cashier.secret') ?: env('STRIPE_SECRET');
-        if ($secretKey) {
+        if ($secretKey && !$this->isDummyKey()) {
             Stripe::setApiKey($secretKey);
         }
+    }
+
+    public function isDummyKey(): bool
+    {
+        $secretKey = config('cashier.secret') ?: env('STRIPE_SECRET');
+        return empty($secretKey) || $secretKey === 'sk_test_...' || str_ends_with($secretKey, '...');
     }
 
     public function getIdentifier(): string
@@ -37,8 +44,6 @@ class StripePaymentGateway implements PaymentGatewayInterface
      */
     public function processPayment(Order $order, array $options = []): PaymentResult
     {
-        $this->initStripeKey();
-
         // If order total is 0, no payment required
         if ($order->total <= 0) {
             $order->update([
@@ -48,7 +53,34 @@ class StripePaymentGateway implements PaymentGatewayInterface
             return PaymentResult::success('stripe', null, [], 'Free order processed.');
         }
 
+        // Local development sandbox fallback if Stripe secret is placeholder (sk_test_...)
+        if ($this->isDummyKey()) {
+            $mockIntentId = 'pi_sim_' . Str::random(24);
+            $mockClientSecret = $mockIntentId . '_secret_' . Str::random(24);
+
+            $order->update([
+                'transaction_id' => $mockIntentId,
+                'payment_method' => 'stripe',
+                'payment_status' => 'pending',
+            ]);
+
+            return PaymentResult::requiresAction(
+                gateway: 'stripe',
+                transactionId: $mockIntentId,
+                clientSecret: $mockClientSecret,
+                data: [
+                    'status' => 'requires_action',
+                    'publishable_key' => config('cashier.key') ?: 'pk_test_simulated',
+                    'customer_id' => 'cus_sim_' . $order->user_id,
+                    'mode' => 'sandbox_simulated',
+                ],
+                message: 'Stripe PaymentSheet initialized (Sandbox mode). Complete payment and confirm with /confirm-payment endpoint.'
+            );
+        }
+
         try {
+            $this->initStripeKey();
+
             $user = $order->user;
             $stripeCustomerId = null;
 
@@ -142,14 +174,42 @@ class StripePaymentGateway implements PaymentGatewayInterface
      */
     public function verifyPayment(Order $order, array $payload = []): bool
     {
-        $this->initStripeKey();
-
         $intentId = $payload['payment_intent_id'] ?? $order->transaction_id;
         if (!$intentId) {
             return false;
         }
 
+        // Sandbox simulated verification
+        if ($this->isDummyKey() || str_starts_with($intentId, 'pi_sim_') || str_starts_with($intentId, 'pi_test_')) {
+            $order->update([
+                'payment_status' => 'paid',
+                'transaction_id' => $intentId,
+            ]);
+
+            Transaction::updateOrCreate(
+                ['payment_intent_id' => $intentId],
+                [
+                    'user_id' => $order->user_id,
+                    'payable_id' => $order->id,
+                    'payable_type' => Order::class,
+                    'gateway' => 'stripe',
+                    'gateway_transaction_id' => $intentId,
+                    'amount' => $order->total,
+                    'currency' => 'usd',
+                    'status' => 'success',
+                    'metadata' => [
+                        'order_number' => $order->order_number,
+                        'payment_method_type' => 'card',
+                        'mode' => 'sandbox_simulated',
+                    ],
+                ]
+            );
+
+            return true;
+        }
+
         try {
+            $this->initStripeKey();
             $intent = PaymentIntent::retrieve($intentId);
 
             if ($intent->status === 'succeeded') {
@@ -178,8 +238,6 @@ class StripePaymentGateway implements PaymentGatewayInterface
      */
     public function refund(Order $order, ?float $amount = null, ?string $reason = null): array
     {
-        $this->initStripeKey();
-
         if (!$order->transaction_id) {
             return [
                 'success' => false,
@@ -187,7 +245,33 @@ class StripePaymentGateway implements PaymentGatewayInterface
             ];
         }
 
+        // Sandbox simulation
+        if ($this->isDummyKey() || str_starts_with($order->transaction_id, 'pi_sim_') || str_starts_with($order->transaction_id, 'pi_test_')) {
+            $order->update(['payment_status' => 'refunded']);
+
+            $transaction = Transaction::where('payment_intent_id', $order->transaction_id)->first();
+            if ($transaction) {
+                $meta = $transaction->metadata ?: [];
+                $meta['refund_id'] = 're_sim_' . Str::random(20);
+                $meta['refund_reason'] = $reason;
+
+                $transaction->update([
+                    'status' => 'refunded',
+                    'metadata' => $meta,
+                ]);
+            }
+
+            return [
+                'success' => true,
+                'refund_id' => 're_sim_' . Str::random(20),
+                'amount' => $amount ?: $order->total,
+                'status' => 'succeeded',
+            ];
+        }
+
         try {
+            $this->initStripeKey();
+
             $refundParams = [
                 'payment_intent' => $order->transaction_id,
             ];

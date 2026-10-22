@@ -39,7 +39,7 @@ class CustomerOrderController extends Controller
             return response_error('Unauthorized access to this order.', [], 403);
         }
 
-        $order->load(['store:id,name,logo,phone,street_address', 'items', 'address', 'reviews']);
+        $order->load(['store:id,name,logo,phone,street_address', 'items', 'address', 'reviews', 'transaction']);
 
         return response_success('Order details retrieved successfully.', $order);
     }

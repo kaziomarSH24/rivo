@@ -6,12 +6,15 @@ use App\Models\Cart;
 use App\Models\Order;
 use App\Models\OrderItem;
 use App\Models\Product;
+use App\Models\ProductVariant;
 use App\Models\Store;
 use App\Models\User;
 use App\Models\UserAddress;
 use App\Services\BaseService;
 use App\Services\Payment\PaymentGatewayManager;
 use Carbon\Carbon;
+use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Spatie\QueryBuilder\AllowedFilter;
@@ -23,11 +26,12 @@ class OrderService extends BaseService
     protected function getAllowedFilters(): array
     {
         return [
-            AllowedFilter::exact('user_id'),
-            AllowedFilter::exact('store_id'),
-            AllowedFilter::exact('status'),
-            AllowedFilter::exact('payment_status'),
+            AllowedFilter::exact('id'),
             AllowedFilter::exact('order_number'),
+            AllowedFilter::exact('status'),
+            AllowedFilter::exact('delivery_type'),
+            AllowedFilter::exact('store_id'),
+            AllowedFilter::exact('payment_status'),
             AllowedFilter::scope('ongoing'),
             AllowedFilter::scope('completed'),
             AllowedFilter::scope('cancelled'),
@@ -65,7 +69,16 @@ class OrderService extends BaseService
 
         return DB::transaction(function () use ($user, $data, $cartData, $cart, $cartService, $paymentManager, $paymentMethod) {
             $store = $cart->store;
-            $address = isset($data['address_id']) ? UserAddress::find($data['address_id']) : null;
+
+            // Validate delivery address ownership
+            $address = null;
+            if (!empty($data['address_id'])) {
+                $address = UserAddress::where('id', $data['address_id'])->where('user_id', $user->id)->first();
+                if (!$address) {
+                    throw new \Exception('The selected delivery address does not exist or does not belong to your account.');
+                }
+            }
+
             $addressJson = $address ? [
                 'street_address' => $address->street_address,
                 'house_no' => $address->house_no,
@@ -74,6 +87,18 @@ class OrderService extends BaseService
                 'state' => $address->state,
                 'zip_code' => $address->zip_code,
             ] : ($data['delivery_address'] ?? null);
+
+            // Pre-validate inventory stock for all cart items
+            foreach ($cart->items as $item) {
+                $product = $item->product;
+                $variant = $item->variant;
+
+                if ($variant && $variant->stock < $item->quantity) {
+                    throw new \Exception("Item '{$product->name}' ({$variant->flavor}) does not have enough stock (available: {$variant->stock}).");
+                } elseif (!$variant && $product->stock < $item->quantity) {
+                    throw new \Exception("Item '{$product->name}' does not have enough stock (available: {$product->stock}).");
+                }
+            }
 
             $orderNumber = 'RIV-' . strtoupper(Str::random(5));
 
@@ -116,9 +141,12 @@ class OrderService extends BaseService
                     'image' => is_array($product->images) && !empty($product->images) ? $product->images[0] : null,
                 ]);
 
-                // Decrement inventory stock & increment sales count
+                // Decrement product & variant inventory stock, increment sales count
                 $product->decrement('stock', $item->quantity);
                 $product->increment('sales_count', $item->quantity);
+                if ($variant) {
+                    $variant->decrement('stock', $item->quantity);
+                }
             }
 
             // Clear the cart
@@ -129,6 +157,10 @@ class OrderService extends BaseService
             $paymentResult = $gateway->processPayment($order, [
                 'payment_method_id' => $data['payment_method_id'] ?? null,
             ]);
+
+            if ($paymentResult->status === 'failed') {
+                throw new \Exception($paymentResult->message ?: 'Payment initialization failed. Please try again.');
+            }
 
             return [
                 'order' => $order->fresh(['items', 'store', 'user', 'address', 'transaction']),
@@ -217,11 +249,14 @@ class OrderService extends BaseService
             $order->rejection_reason = $reason ?: 'Rejected by store';
             $order->save();
 
-            // Restore product stock
+            // Restore product & variant stock
             foreach ($order->items as $item) {
                 if ($item->product_id) {
                     Product::where('id', $item->product_id)->increment('stock', $item->quantity);
                     Product::where('id', $item->product_id)->where('sales_count', '>=', $item->quantity)->decrement('sales_count', $item->quantity);
+                }
+                if ($item->variant_id) {
+                    ProductVariant::where('id', $item->variant_id)->increment('stock', $item->quantity);
                 }
             }
 
@@ -243,8 +278,13 @@ class OrderService extends BaseService
     /**
      * Vendor: Update fulfillment stepper status
      */
-    public function updateFulfillmentStatus(Store $store, Order $order, string $newStatus): Order
-    {
+    public function updateFulfillmentStatus(
+        Store $store,
+        Order $order,
+        string $newStatus,
+        ?string $reason = null,
+        ?PaymentGatewayManager $paymentManager = null
+    ): Order {
         if ($order->store_id !== $store->id) {
             throw new \Exception('Unauthorized access to this order.');
         }
@@ -254,19 +294,24 @@ class OrderService extends BaseService
             throw new \Exception("Invalid order status: {$newStatus}");
         }
 
+        if ($newStatus === 'cancelled') {
+            return $this->vendorRejectOrder($store, $order, $reason, $paymentManager);
+        }
+
         $order->status = $newStatus;
         if ($newStatus === 'delivered') {
             $order->delivered_at = Carbon::now();
-            // If COD, mark paid upon successful delivery
+            // If COD, mark paid upon successful delivery and update transaction
             if ($order->payment_method === 'cash_on_delivery' && $order->payment_status !== 'paid') {
                 $order->payment_status = 'paid';
+                if ($order->transaction) {
+                    $order->transaction->update(['status' => 'success']);
+                }
             }
-        } elseif ($newStatus === 'cancelled') {
-            $order->cancelled_at = Carbon::now();
         }
         $order->save();
 
-        return $order->load(['items', 'user']);
+        return $order->load(['items', 'user', 'transaction']);
     }
 
     /**
@@ -292,11 +337,14 @@ class OrderService extends BaseService
             $order->rejection_reason = $reason ?: 'Cancelled by customer';
             $order->save();
 
-            // Restore product stock
+            // Restore product & variant stock
             foreach ($order->items as $item) {
                 if ($item->product_id) {
                     Product::where('id', $item->product_id)->increment('stock', $item->quantity);
                     Product::where('id', $item->product_id)->where('sales_count', '>=', $item->quantity)->decrement('sales_count', $item->quantity);
+                }
+                if ($item->variant_id) {
+                    ProductVariant::where('id', $item->variant_id)->increment('stock', $item->quantity);
                 }
             }
 
@@ -335,3 +383,4 @@ class OrderService extends BaseService
         return $query->paginate(15);
     }
 }
+

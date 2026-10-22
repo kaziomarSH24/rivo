@@ -3,13 +3,23 @@
 namespace App\Http\Requests\Marketplace;
 
 use App\Http\Requests\BaseRequest;
+use Illuminate\Validation\Rule;
 
 class CheckoutRequest extends BaseRequest
 {
     public function rules(): array
     {
+        $userId = $this->user()?->id;
+
         return [
-            'address_id' => 'nullable|exists:user_addresses,id',
+            'address_id' => [
+                'nullable',
+                Rule::exists('user_addresses', 'id')->where(function ($query) use ($userId) {
+                    if ($userId) {
+                        $query->where('user_id', $userId);
+                    }
+                }),
+            ],
             'delivery_address' => 'required_without:address_id|nullable|array',
             'delivery_address.street_address' => 'required_with:delivery_address|string|max:255',
             'delivery_address.house_no' => 'nullable|string|max:100',

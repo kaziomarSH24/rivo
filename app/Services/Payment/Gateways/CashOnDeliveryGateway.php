@@ -16,9 +16,12 @@ class CashOnDeliveryGateway implements PaymentGatewayInterface
 
     public function processPayment(Order $order, array $options = []): PaymentResult
     {
+        $transactionId = 'COD-' . $order->order_number;
+
         $order->update([
             'payment_method' => 'cash_on_delivery',
             'payment_status' => 'pending',
+            'transaction_id' => $transactionId,
         ]);
 
         Transaction::updateOrCreate(
@@ -29,6 +32,8 @@ class CashOnDeliveryGateway implements PaymentGatewayInterface
             ],
             [
                 'user_id' => $order->user_id,
+                'gateway_transaction_id' => $transactionId,
+                'payment_intent_id' => $transactionId,
                 'amount' => $order->total,
                 'currency' => 'usd',
                 'status' => 'pending',
@@ -41,7 +46,7 @@ class CashOnDeliveryGateway implements PaymentGatewayInterface
 
         return PaymentResult::pending(
             gateway: 'cash_on_delivery',
-            transactionId: 'COD-' . $order->order_number,
+            transactionId: $transactionId,
             data: [
                 'status' => 'pending',
             ],

@@ -8,6 +8,7 @@ use App\Models\Order;
 use App\Models\OrderItem;
 use App\Models\Product;
 use App\Models\ProductCategory;
+use App\Models\ProductVariant;
 use App\Models\Store;
 use App\Models\Transaction;
 use App\Models\User;
@@ -145,6 +146,7 @@ class PaymentGatewayTest extends TestCase
         $this->assertNotNull($order->transaction);
         $this->assertEquals('cash_on_delivery', $order->transaction->gateway);
         $this->assertEquals('pending', $order->transaction->status);
+        $this->assertEquals('COD-' . $order->order_number, $order->transaction_id);
     }
 
     public function test_customer_can_confirm_order_payment(): void
@@ -197,7 +199,7 @@ class PaymentGatewayTest extends TestCase
         ]);
 
         $response = $this->actingAs($otherUser, 'sanctum')->postJson("/api/v1/marketplace/orders/{$order->id}/confirm-payment");
-        $response->assertStatus(422);
+        $response->assertStatus(403);
     }
 
     public function test_stripe_webhook_payment_intent_succeeded_marks_order_as_paid(): void
@@ -285,5 +287,100 @@ class PaymentGatewayTest extends TestCase
         // Stock restored back to initial
         $this->assertEquals($initialStock, $this->product->fresh()->stock);
         $this->assertEquals('cancelled', $order->fresh()->status);
+    }
+
+    public function test_checkout_fails_when_product_stock_is_insufficient(): void
+    {
+        $address = UserAddress::create([
+            'user_id' => $this->customer->id,
+            'title' => 'Office',
+            'street_address' => '456 Business Rd',
+            'city' => 'Austin',
+            'state' => 'TX',
+            'zip_code' => '78702',
+            'is_default' => true,
+        ]);
+
+        // Set low stock
+        $this->product->update(['stock' => 1]);
+
+        // Add 2 to cart
+        $this->actingAs($this->customer, 'sanctum')->postJson('/api/v1/marketplace/cart/items', [
+            'product_id' => $this->product->id,
+            'quantity' => 2,
+        ]);
+
+        $response = $this->actingAs($this->customer, 'sanctum')->postJson('/api/v1/marketplace/checkout', [
+            'address_id' => $address->id,
+            'payment_method' => 'cash_on_delivery',
+        ]);
+
+        $response->assertStatus(422)
+            ->assertJson(['ok' => false]);
+    }
+
+    public function test_checkout_fails_when_address_belongs_to_another_user(): void
+    {
+        $otherUser = User::create([
+            'name' => 'Stranger',
+            'email' => 'stranger_' . time() . '@yopmail.com',
+            'password' => bcrypt('password123'),
+        ]);
+
+        $otherAddress = UserAddress::create([
+            'user_id' => $otherUser->id,
+            'street_address' => '999 Stranger Way',
+            'city' => 'Dallas',
+            'state' => 'TX',
+            'zip_code' => '75001',
+        ]);
+
+        $this->actingAs($this->customer, 'sanctum')->postJson('/api/v1/marketplace/cart/items', [
+            'product_id' => $this->product->id,
+            'quantity' => 1,
+        ]);
+
+        $response = $this->actingAs($this->customer, 'sanctum')->postJson('/api/v1/marketplace/checkout', [
+            'address_id' => $otherAddress->id,
+            'payment_method' => 'cash_on_delivery',
+        ]);
+
+        // Fails validation due to user scoping
+        $response->assertStatus(422);
+    }
+
+    public function test_cod_delivery_updates_both_order_and_transaction_status(): void
+    {
+        $order = Order::create([
+            'order_number' => 'RIV-CODDEL1',
+            'user_id' => $this->customer->id,
+            'store_id' => $this->store->id,
+            'status' => 'out_for_delivery',
+            'delivery_type' => 'express',
+            'subtotal' => 30.00,
+            'delivery_fee' => 5.00,
+            'total' => 35.00,
+            'payment_method' => 'cash_on_delivery',
+            'payment_status' => 'pending',
+        ]);
+
+        $transaction = Transaction::create([
+            'user_id' => $this->customer->id,
+            'payable_id' => $order->id,
+            'payable_type' => Order::class,
+            'gateway' => 'cash_on_delivery',
+            'gateway_transaction_id' => 'COD-' . $order->order_number,
+            'amount' => 35.00,
+            'currency' => 'usd',
+            'status' => 'pending',
+        ]);
+
+        $response = $this->actingAs($this->vendorUser, 'sanctum')->patchJson("/api/v1/vendor/orders/{$order->id}/status", [
+            'status' => 'delivered',
+        ]);
+
+        $response->assertStatus(200);
+        $this->assertEquals('paid', $order->fresh()->payment_status);
+        $this->assertEquals('success', $transaction->fresh()->status);
     }
 }
