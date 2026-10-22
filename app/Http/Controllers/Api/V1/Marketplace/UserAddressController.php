@@ -4,20 +4,29 @@ namespace App\Http\Controllers\Api\V1\Marketplace;
 
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Marketplace\StoreAddressRequest;
+use App\Http\Resources\Marketplace\UserAddressResource;
 use App\Models\UserAddress;
+use App\Services\Marketplace\UserAddressService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
 class UserAddressController extends Controller
 {
+    protected UserAddressService $addressService;
+
+    public function __construct(UserAddressService $addressService)
+    {
+        $this->addressService = $addressService;
+    }
+
     /**
      * List user delivery addresses
      */
     public function index(Request $request): JsonResponse
     {
-        $addresses = $request->user()->addresses()->orderByDesc('is_default')->latest()->get();
+        $addresses = $this->addressService->getUserAddresses($request->user());
 
-        return response_success('User addresses retrieved successfully.', $addresses);
+        return response_success('User addresses retrieved successfully.', UserAddressResource::collection($addresses));
     }
 
     /**
@@ -25,21 +34,9 @@ class UserAddressController extends Controller
      */
     public function store(StoreAddressRequest $request): JsonResponse
     {
-        $user = $request->user();
-        $data = $request->validated();
+        $address = $this->addressService->storeAddress($request->user(), $request->validated());
 
-        if (!empty($data['is_default'])) {
-            $user->addresses()->update(['is_default' => false]);
-        } else {
-            // First address is default
-            if ($user->addresses()->count() === 0) {
-                $data['is_default'] = true;
-            }
-        }
-
-        $address = $user->addresses()->create($data);
-
-        return response_success('Delivery address saved successfully.', $address, 201);
+        return response_success('Delivery address saved successfully.', new UserAddressResource($address), 201);
     }
 
     /**
@@ -51,14 +48,9 @@ class UserAddressController extends Controller
             return response_error('Unauthorized access to this address.', [], 403);
         }
 
-        $data = $request->validated();
-        if (!empty($data['is_default'])) {
-            $request->user()->addresses()->where('id', '!=', $address->id)->update(['is_default' => false]);
-        }
+        $updated = $this->addressService->updateAddress($request->user(), $address, $request->validated());
 
-        $address->update($data);
-
-        return response_success('Delivery address updated successfully.', $address);
+        return response_success('Delivery address updated successfully.', new UserAddressResource($updated));
     }
 
     /**
@@ -70,10 +62,9 @@ class UserAddressController extends Controller
             return response_error('Unauthorized access to this address.', [], 403);
         }
 
-        $request->user()->addresses()->update(['is_default' => false]);
-        $address->update(['is_default' => true]);
+        $updated = $this->addressService->setDefaultAddress($request->user(), $address);
 
-        return response_success('Default delivery address updated.', $address);
+        return response_success('Default delivery address updated.', new UserAddressResource($updated));
     }
 
     /**
@@ -85,7 +76,7 @@ class UserAddressController extends Controller
             return response_error('Unauthorized access to this address.', [], 403);
         }
 
-        $address->delete();
+        $this->addressService->deleteAddress($request->user(), $address);
 
         return response_success('Delivery address deleted successfully.', []);
     }
