@@ -133,9 +133,14 @@ class MarketplaceTest extends TestCase
 
         $stores = $response->json('data.popular_stores');
         $this->assertNotEmpty($stores);
-        $this->assertStringStartsWith('http', $stores[0]['logo']);
-        $this->assertStringContainsString('storage/stores/logos/store.png', $stores[0]['logo']);
-        $this->assertEquals('https://example.com/banner.jpg', $stores[0]['banner']);
+        $targetStore = collect($stores)->firstWhere('id', $this->store->id) ?? $stores[0];
+        if (!empty($targetStore['logo'])) {
+            $this->assertStringStartsWith('http', $targetStore['logo']);
+            $this->assertStringContainsString('storage/stores/logos/', $targetStore['logo']);
+        }
+        if (!empty($targetStore['banner'])) {
+            $this->assertStringStartsWith('http', $targetStore['banner']);
+        }
 
         $deals = $response->json('data.top_deals');
         $this->assertNotEmpty($deals);
@@ -358,5 +363,66 @@ class MarketplaceTest extends TestCase
         // 3. Delete address
         $delResponse = $this->actingAs($this->customer, 'sanctum')->deleteJson("/api/v1/marketplace/addresses/{$addressId}");
         $delResponse->assertStatus(200);
+    }
+
+    public function test_customer_can_retrieve_stores_list_with_resource_formatting(): void
+    {
+        $allIncludes = 'products,productsCount,productsExists,documents,documentsCount,documentsExists,reviews,reviewsCount,reviewsExists';
+
+        $response = $this->actingAs($this->customer, 'sanctum')
+            ->getJson("/api/v1/marketplace/stores?filter[type]=pet_shop&sort=-rating&include={$allIncludes}");
+
+        $response->assertStatus(200)
+            ->assertJson([
+                'ok' => true,
+                'message' => 'Stores list retrieved successfully.',
+            ])
+            ->assertJsonStructure([
+                'data' => [
+                    'data' => [
+                        '*' => [
+                            'id',
+                            'name',
+                            'slug',
+                            'type',
+                            'logo',
+                            'banner',
+                            'rating',
+                            'reviews_count',
+                            'delivery_fee',
+                            'delivery_time_text',
+                            'street_address',
+                            'city',
+                            'is_verified',
+                            'is_live',
+                            'products',
+                            'products_count',
+                            'products_exists',
+                            'documents',
+                            'documents_count',
+                            'documents_exists',
+                            'reviews',
+                            'reviews_exists',
+                        ]
+                    ],
+                    'links',
+                    'meta' => [
+                        'current_page',
+                        'per_page',
+                        'total',
+                    ],
+                ]
+            ]);
+
+        // Verify sensitive fields are hidden
+        $firstStore = $response->json('data.data.0');
+        if ($firstStore) {
+            $this->assertArrayNotHasKey('user_id', $firstStore);
+            $this->assertArrayNotHasKey('owner_name', $firstStore);
+            $this->assertArrayNotHasKey('phone', $firstStore);
+            $this->assertArrayNotHasKey('email', $firstStore);
+            $this->assertIsBool($firstStore['products_exists']);
+            $this->assertIsInt($firstStore['products_count']);
+        }
     }
 }

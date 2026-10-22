@@ -9,6 +9,8 @@ use App\Models\StoreDocument;
 use App\Models\User;
 use App\Services\BaseService;
 use App\Traits\FileUploadTrait;
+use Spatie\QueryBuilder\AllowedFilter;
+use Spatie\QueryBuilder\AllowedInclude;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
@@ -21,17 +23,42 @@ class StoreService extends BaseService
 
     protected function getAllowedIncludes(): array
     {
-        return ['user', 'products', 'documents', 'reviews'];
+        return [
+            AllowedInclude::relationship('products'),
+            AllowedInclude::count('productsCount', 'products'),
+            AllowedInclude::count('products_count', 'products'),
+            AllowedInclude::exists('productsExists', 'products'),
+            AllowedInclude::exists('products_exists', 'products'),
+
+            AllowedInclude::relationship('documents'),
+            AllowedInclude::count('documentsCount', 'documents'),
+            AllowedInclude::count('documents_count', 'documents'),
+            AllowedInclude::exists('documentsExists', 'documents'),
+            AllowedInclude::exists('documents_exists', 'documents'),
+
+            AllowedInclude::relationship('reviews'),
+            AllowedInclude::count('reviewsCount', 'reviews'),
+            AllowedInclude::count('reviews_count', 'reviews'),
+            AllowedInclude::exists('reviewsExists', 'reviews'),
+            AllowedInclude::exists('reviews_exists', 'reviews'),
+        ];
     }
 
     protected function getAllowedFilters(): array
     {
-        return ['type', 'is_verified', 'is_live', 'city'];
+        return [
+            AllowedFilter::exact('type'),
+            AllowedFilter::exact('is_verified'),
+            AllowedFilter::exact('verification_status'),
+            AllowedFilter::exact('is_live'),
+            AllowedFilter::exact('city'),
+            AllowedFilter::partial('name'),
+        ];
     }
 
     protected function getAllowedSorts(): array
     {
-        return ['created_at', 'rating', 'reviews_count', 'name'];
+        return ['created_at', 'rating', 'reviews_count', 'name', 'delivery_fee'];
     }
 
     /**

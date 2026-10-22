@@ -77,4 +77,8 @@ class Store extends Model
     {
         return $this->morphMany(Review::class, 'reviewable');
     }
+    public function getRelatedCacheTags(): array
+    {
+        return ['products'];
+    }
 }

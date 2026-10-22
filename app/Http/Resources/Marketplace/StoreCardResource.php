@@ -24,6 +24,18 @@ class StoreCardResource extends JsonResource
             'city' => $this->city,
             'is_verified' => (bool) $this->is_verified,
             'is_live' => (bool) $this->is_live,
+
+            // Dynamic relations & conditional attributes (when requested via ?include=...)
+            'products' => ProductCardResource::collection($this->whenLoaded('products')),
+            'products_count' => $this->when(!is_null($this->products_count), fn() => (int) $this->products_count),
+            'products_exists' => $this->when(!is_null($this->products_exists), fn() => (bool) $this->products_exists),
+
+            'documents' => $this->whenLoaded('documents'),
+            'documents_count' => $this->when(!is_null($this->documents_count), fn() => (int) $this->documents_count),
+            'documents_exists' => $this->when(!is_null($this->documents_exists), fn() => (bool) $this->documents_exists),
+
+            'reviews' => $this->whenLoaded('reviews'),
+            'reviews_exists' => $this->when(!is_null($this->reviews_exists), fn() => (bool) $this->reviews_exists),
         ];
     }
 }

@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api\V1\Marketplace;
 use App\Http\Controllers\Controller;
 use App\Http\Resources\Marketplace\CategoryResource;
 use App\Http\Resources\Marketplace\ProductCardResource;
+use App\Http\Resources\Marketplace\StoreCardResource;
 use App\Http\Resources\Marketplace\MarketplaceHomeResource;
 use App\Models\Product;
 use App\Models\ProductCategory;
@@ -58,10 +59,14 @@ class MarketplaceHomeController extends Controller
     public function stores(Request $request): JsonResponse
     {
         $stores = $this->storeService->getAll(function ($q) {
-            $q->where('is_live', true);
+            $q->where('is_live', true)
+              ->where('is_verified', true)
+              ->where('verification_status', 'verified');
         });
 
-        return response_success('Stores list retrieved successfully.', $stores);
+        $paginated = StoreCardResource::collection($stores)->response()->getData(true);
+
+        return response_success('Stores list retrieved successfully.', $paginated);
     }
 
     /**

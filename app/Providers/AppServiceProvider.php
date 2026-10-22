@@ -6,6 +6,10 @@ namespace App\Providers;
 // use App\Observers\ProductObserver;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\ServiceProvider;
+use App\Models\Product;
+use App\Models\Store;
+use Illuminate\Database\Eloquent\Relations\Relation;
+
 
 class AppServiceProvider extends ServiceProvider
 {
@@ -33,6 +37,13 @@ class AppServiceProvider extends ServiceProvider
         Gate::before(function ($user, $ability) {
             return $user->hasRole('admin') ? true : null;
         });
+
+        Relation::morphMap([
+            'product' => Product::class,
+            'store' => Store::class,
+            Product::class => Product::class,
+            Store::class => Store::class,
+        ]);
 
         // Observers
         // Product::observe(ProductObserver::class);

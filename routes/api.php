@@ -13,6 +13,7 @@ use App\Http\Controllers\Api\V1\Chat\GroupController;
 use App\Http\Controllers\Api\V1\Chat\MessageController;
 use App\Http\Controllers\Api\V1\Notification\NotificationController;
 use App\Http\Controllers\Api\V1\Pet\PetController;
+use App\Http\Controllers\Api\V1\Pet\PetBadgeController;
 use App\Http\Controllers\Api\V1\Walk\WalkController;
 use App\Http\Controllers\Api\V1\Walk\WalkRouteController;
 use App\Http\Controllers\Api\V1\Payment\InvoiceController;
@@ -26,6 +27,26 @@ use App\Http\Controllers\Api\V1\Webhook\RevenueCatWebhookController;
 use App\Http\Controllers\Api\V1\Ai\AiController;
 use App\Http\Controllers\Api\V1\EmergencyContact\EmergencyContactController;
 use App\Http\Controllers\Api\V1\Appointment\AppointmentController;
+
+// Social Module Controllers
+use App\Http\Controllers\Api\V1\Social\MatchController;
+use App\Http\Controllers\Api\V1\Social\ConnectionController;
+use App\Http\Controllers\Api\V1\Social\PostBookmarkController;
+use App\Http\Controllers\Api\V1\Social\PostController;
+use App\Http\Controllers\Api\V1\Social\PostCommentController;
+
+// Marketplace Module Controllers
+use App\Http\Controllers\Api\V1\Marketplace\MarketplaceHomeController;
+use App\Http\Controllers\Api\V1\Marketplace\ReviewController;
+use App\Http\Controllers\Api\V1\Marketplace\UserAddressController;
+use App\Http\Controllers\Api\V1\Marketplace\CartController;
+use App\Http\Controllers\Api\V1\Marketplace\CheckoutController;
+use App\Http\Controllers\Api\V1\Marketplace\CustomerOrderController;
+
+// Vendor Module Controllers
+use App\Http\Controllers\Api\V1\Vendor\VendorStoreController;
+use App\Http\Controllers\Api\V1\Vendor\VendorProductController;
+use App\Http\Controllers\Api\V1\Vendor\VendorOrderController;
 
 // ==========================================
 // PUBLIC ROUTES
@@ -69,7 +90,7 @@ Route::middleware(['auth:sanctum', 'throttle:api'])->prefix('v1')->name('api.v1.
         Route::apiResource('pets', PetController::class);
 
     // --- Pet Badges (Achievements) ---
-    Route::controller(\App\Http\Controllers\Api\V1\Pet\PetBadgeController::class)->prefix('pets/{pet}/badges')->group(function () {
+    Route::controller(PetBadgeController::class)->prefix('pets/{pet}/badges')->group(function () {
         Route::get('/', 'index');
         Route::post('display', 'display');
     });
@@ -208,29 +229,41 @@ Route::middleware(['auth:sanctum', 'throttle:api'])->prefix('v1')->name('api.v1.
         Route::get('community/lost-pets', 'communityFeed');
     });
 
-    // Social Module (Phase 1: Match & Connections)
+        // Social Module (Phase 1: Match & Connections)
     Route::prefix('social')->group(function () {
         // Discovery & Match
-        Route::get('discover/{pet}', [\App\Http\Controllers\Api\V1\Social\MatchController::class, 'discover']);
-        Route::post('swipe/{pet}', [\App\Http\Controllers\Api\V1\Social\MatchController::class, 'swipe']);
+        Route::controller(MatchController::class)->group(function () {
+            Route::get('discover/{pet}', 'discover');
+            Route::post('swipe/{pet}', 'swipe');
+        });
 
         // Friends & Requests
-        Route::get('match-list/{pet}', [\App\Http\Controllers\Api\V1\Social\ConnectionController::class, 'index']);
-        Route::get('requests/{pet}', [\App\Http\Controllers\Api\V1\Social\ConnectionController::class, 'requests']);
-        Route::post('request/send/{pet}', [\App\Http\Controllers\Api\V1\Social\ConnectionController::class, 'sendRequest']);
-        Route::post('request/respond/{pet}', [\App\Http\Controllers\Api\V1\Social\ConnectionController::class, 'respond']);
+        Route::controller(ConnectionController::class)->group(function () {
+            Route::get('match-list/{pet}', 'index');
+            Route::get('requests/{pet}', 'requests');
+            Route::post('request/send/{pet}', 'sendRequest');
+            Route::post('request/respond/{pet}', 'respond');
+        });
 
-                // Saved Posts / Bookmarks
-        Route::get('posts/saved', [\App\Http\Controllers\Api\V1\Social\PostBookmarkController::class, 'index']);
-        Route::post('posts/{post}/bookmark', [\App\Http\Controllers\Api\V1\Social\PostBookmarkController::class, 'toggle']);
+        // Saved Posts / Bookmarks
+        Route::controller(PostBookmarkController::class)->group(function () {
+            Route::get('posts/saved', 'index');
+            Route::post('posts/{post}/bookmark', 'toggle');
+        });
 
         // Social Feed & Posts
-        Route::apiResource('posts', \App\Http\Controllers\Api\V1\Social\PostController::class);
-        Route::post('posts/{post}/like', [\App\Http\Controllers\Api\V1\Social\PostController::class, 'toggleLike']);
-        Route::post('posts/{post}/react', [\App\Http\Controllers\Api\V1\Social\PostController::class, 'toggleLike']);
-        Route::get('posts/{post}/comments', [\App\Http\Controllers\Api\V1\Social\PostCommentController::class, 'index']);
-        Route::post('posts/{post}/comments', [\App\Http\Controllers\Api\V1\Social\PostCommentController::class, 'store']);
-        Route::delete('posts/{post}/comments/{comment}', [\App\Http\Controllers\Api\V1\Social\PostCommentController::class, 'destroy']);
+        Route::controller(PostController::class)->group(function () {
+            Route::apiResource('posts', PostController::class);
+            Route::post('posts/{post}/like', 'toggleLike');
+            Route::post('posts/{post}/react', 'toggleLike');
+        });
+
+        // Post Comments
+        Route::controller(PostCommentController::class)->group(function () {
+            Route::get('posts/{post}/comments', 'index');
+            Route::post('posts/{post}/comments', 'store');
+            Route::delete('posts/{post}/comments/{comment}', 'destroy');
+        });
     });
 
     // ==========================================
@@ -238,29 +271,35 @@ Route::middleware(['auth:sanctum', 'throttle:api'])->prefix('v1')->name('api.v1.
     // ==========================================
     Route::prefix('vendor')->group(function () {
         // Store Onboarding & Profile
-        Route::post('store', [\App\Http\Controllers\Api\V1\Vendor\VendorStoreController::class, 'store']);
-        Route::get('profile', [\App\Http\Controllers\Api\V1\Vendor\VendorStoreController::class, 'profile']);
-        Route::post('profile', [\App\Http\Controllers\Api\V1\Vendor\VendorStoreController::class, 'updateProfile']);
-        Route::post('documents', [\App\Http\Controllers\Api\V1\Vendor\VendorStoreController::class, 'uploadDocument']);
-        Route::delete('documents/{document}', [\App\Http\Controllers\Api\V1\Vendor\VendorStoreController::class, 'deleteDocument']);
-        Route::get('dashboard', [\App\Http\Controllers\Api\V1\Vendor\VendorStoreController::class, 'dashboard']);
-        Route::get('analytics', [\App\Http\Controllers\Api\V1\Vendor\VendorStoreController::class, 'analytics']);
+        Route::controller(VendorStoreController::class)->group(function () {
+            Route::post('store', 'store');
+            Route::get('profile', 'profile');
+            Route::post('profile', 'updateProfile');
+            Route::post('documents', 'uploadDocument');
+            Route::delete('documents/{document}', 'deleteDocument');
+            Route::get('dashboard', 'dashboard');
+            Route::get('analytics', 'analytics');
+        });
 
         // Catalog & 4-Step Product Wizard
-        Route::get('products', [\App\Http\Controllers\Api\V1\Vendor\VendorProductController::class, 'index']);
-        Route::post('products', [\App\Http\Controllers\Api\V1\Vendor\VendorProductController::class, 'store']);
-        Route::get('products/{product}', [\App\Http\Controllers\Api\V1\Vendor\VendorProductController::class, 'show']);
-        Route::post('products/{product}', [\App\Http\Controllers\Api\V1\Vendor\VendorProductController::class, 'update']);
-        Route::patch('products/{product}/stock', [\App\Http\Controllers\Api\V1\Vendor\VendorProductController::class, 'updateStock']);
-        Route::patch('products/{product}/toggle-active', [\App\Http\Controllers\Api\V1\Vendor\VendorProductController::class, 'toggleActive']);
-        Route::delete('products/{product}', [\App\Http\Controllers\Api\V1\Vendor\VendorProductController::class, 'destroy']);
+        Route::prefix('products')->controller(VendorProductController::class)->group(function () {
+            Route::get('/', 'index');
+            Route::post('/', 'store');
+            Route::get('{product}', 'show');
+            Route::post('{product}', 'update');
+            Route::patch('{product}/stock', 'updateStock');
+            Route::patch('{product}/toggle-active', 'toggleActive');
+            Route::delete('{product}', 'destroy');
+        });
 
         // Order Management & Fulfillment Stepper
-        Route::get('orders', [\App\Http\Controllers\Api\V1\Vendor\VendorOrderController::class, 'index']);
-        Route::get('orders/{order}', [\App\Http\Controllers\Api\V1\Vendor\VendorOrderController::class, 'show']);
-        Route::post('orders/{order}/accept', [\App\Http\Controllers\Api\V1\Vendor\VendorOrderController::class, 'accept']);
-        Route::post('orders/{order}/reject', [\App\Http\Controllers\Api\V1\Vendor\VendorOrderController::class, 'reject']);
-        Route::patch('orders/{order}/status', [\App\Http\Controllers\Api\V1\Vendor\VendorOrderController::class, 'updateStatus']);
+        Route::prefix('orders')->controller(VendorOrderController::class)->group(function () {
+            Route::get('/', 'index');
+            Route::get('{order}', 'show');
+            Route::post('{order}/accept', 'accept');
+            Route::post('{order}/reject', 'reject');
+            Route::patch('{order}/status', 'updateStatus');
+        });
     });
 
     // ==========================================
@@ -268,41 +307,54 @@ Route::middleware(['auth:sanctum', 'throttle:api'])->prefix('v1')->name('api.v1.
     // ==========================================
     Route::prefix('marketplace')->group(function () {
         // Discovery & Catalog
-        Route::get('home', [\App\Http\Controllers\Api\V1\Marketplace\MarketplaceHomeController::class, 'index']);
-        Route::get('stores', [\App\Http\Controllers\Api\V1\Marketplace\MarketplaceHomeController::class, 'stores']);
-        Route::get('categories', [\App\Http\Controllers\Api\V1\Marketplace\MarketplaceHomeController::class, 'categories']);
-        Route::get('categories/{category}/products', [\App\Http\Controllers\Api\V1\Marketplace\MarketplaceHomeController::class, 'categoryProducts']);
-        Route::get('products', [\App\Http\Controllers\Api\V1\Marketplace\MarketplaceHomeController::class, 'products']);
-        Route::get('search', [\App\Http\Controllers\Api\V1\Marketplace\MarketplaceHomeController::class, 'search']);
-        Route::delete('search/recent', [\App\Http\Controllers\Api\V1\Marketplace\MarketplaceHomeController::class, 'clearRecentSearches']);
-        Route::get('stores/{store}', [\App\Http\Controllers\Api\V1\Marketplace\MarketplaceHomeController::class, 'storeProfile']);
-        Route::get('products/{product}', [\App\Http\Controllers\Api\V1\Marketplace\MarketplaceHomeController::class, 'productDetails']);
+        Route::controller(MarketplaceHomeController::class)->group(function () {
+            Route::get('home', 'index');
+            Route::get('stores', 'stores');
+            Route::get('categories', 'categories');
+            Route::get('categories/{category}/products', 'categoryProducts');
+            Route::get('products', 'products');
+            Route::get('search', 'search');
+            Route::delete('search/recent', 'clearRecentSearches');
+            Route::get('stores/{store}', 'storeProfile');
+            Route::get('products/{product}', 'productDetails');
+        });
 
         // Reviews
-        Route::post('reviews', [\App\Http\Controllers\Api\V1\Marketplace\ReviewController::class, 'store']);
-        Route::get('products/{product}/reviews', [\App\Http\Controllers\Api\V1\Marketplace\ReviewController::class, 'productReviews']);
-        Route::get('stores/{store}/reviews', [\App\Http\Controllers\Api\V1\Marketplace\ReviewController::class, 'storeReviews']);
+        Route::controller(ReviewController::class)->group(function () {
+            Route::post('reviews', 'store');
+            Route::get('products/{product}/reviews', 'productReviews');
+            Route::get('stores/{store}/reviews', 'storeReviews');
+        });
 
         // Delivery Addresses
-        Route::get('addresses', [\App\Http\Controllers\Api\V1\Marketplace\UserAddressController::class, 'index']);
-        Route::post('addresses', [\App\Http\Controllers\Api\V1\Marketplace\UserAddressController::class, 'store']);
-        Route::put('addresses/{address}', [\App\Http\Controllers\Api\V1\Marketplace\UserAddressController::class, 'update']);
-        Route::patch('addresses/{address}/default', [\App\Http\Controllers\Api\V1\Marketplace\UserAddressController::class, 'setDefault']);
-        Route::delete('addresses/{address}', [\App\Http\Controllers\Api\V1\Marketplace\UserAddressController::class, 'destroy']);
+        Route::prefix('addresses')->controller(UserAddressController::class)->group(function () {
+            Route::get('/', 'index');
+            Route::post('/', 'store');
+            Route::put('{address}', 'update');
+            Route::patch('{address}/default', 'setDefault');
+            Route::delete('{address}', 'destroy');
+        });
 
         // Cart
-        Route::get('cart', [\App\Http\Controllers\Api\V1\Marketplace\CartController::class, 'index']);
-        Route::post('cart/items', [\App\Http\Controllers\Api\V1\Marketplace\CartController::class, 'addItem']);
-        Route::patch('cart/items/{item}', [\App\Http\Controllers\Api\V1\Marketplace\CartController::class, 'updateItem']);
-        Route::delete('cart/items/{item}', [\App\Http\Controllers\Api\V1\Marketplace\CartController::class, 'removeItem']);
-        Route::delete('cart', [\App\Http\Controllers\Api\V1\Marketplace\CartController::class, 'clear']);
+        Route::prefix('cart')->controller(CartController::class)->group(function () {
+            Route::get('/', 'index');
+            Route::post('items', 'addItem');
+            Route::patch('items/{item}', 'updateItem');
+            Route::delete('items/{item}', 'removeItem');
+            Route::delete('/', 'clear');
+        });
 
         // Checkout & Orders
-                Route::post('checkout', [\App\Http\Controllers\Api\V1\Marketplace\CheckoutController::class, 'process']);
-        Route::post('orders/{order}/confirm-payment', [\App\Http\Controllers\Api\V1\Marketplace\CheckoutController::class, 'confirmPayment']);
-        Route::get('orders', [\App\Http\Controllers\Api\V1\Marketplace\CustomerOrderController::class, 'index']);
-        Route::get('orders/{order}', [\App\Http\Controllers\Api\V1\Marketplace\CustomerOrderController::class, 'show']);
-        Route::post('orders/{order}/cancel', [\App\Http\Controllers\Api\V1\Marketplace\CustomerOrderController::class, 'cancel']);
+        Route::controller(CheckoutController::class)->group(function () {
+            Route::post('checkout', 'process');
+            Route::post('orders/{order}/confirm-payment', 'confirmPayment');
+        });
+
+        Route::prefix('orders')->controller(CustomerOrderController::class)->group(function () {
+            Route::get('/', 'index');
+            Route::get('{order}', 'show');
+            Route::post('{order}/cancel', 'cancel');
+        });
     });
 });
 

@@ -59,11 +59,12 @@ class MarketplaceHomeService
         // 5. "Products for Pedro" (Personalized for active pet)
         $petProducts = $this->productService->getRecommendedForPet($activePet, 8);
 
-        // 6. Top Deals / Discounted products
+        // 6. Top Deals / Discounted products (Latest discounted deals)
         $topDeals = Product::where('is_active', true)
             ->whereNotNull('discount_price')
             ->where('discount_price', '>', 0)
             ->where('stock', '>', 0)
+            ->latest('updated_at')
             ->with(['brand', 'store'])
             ->limit(8)
             ->get();

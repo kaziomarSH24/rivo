@@ -327,6 +327,59 @@ class MarketplaceSeeder extends Seeder
                 'sales_count' => 88,
             ]
         );
+        // Pharmacy Products for Vet Pharmacy Store
+        $pharm1 = Product::updateOrCreate(
+            ['slug' => 'frontline-plus-flea-tick-medium-dogs'],
+            [
+                'store_id' => $vetPharmacy->id,
+                'category_id' => $categories['health']->id,
+                'brand_id' => $brands['purina']->id,
+                'name' => 'Frontline Plus Flea & Tick Treatment for Dogs (23-44 lbs)',
+                'description' => 'Fast-acting, long-lasting flea and tick control for medium dogs. Waterproof formula that protects for 30 days.',
+                'pet_type' => 'dog',
+                'price' => 45.99,
+                'discount_price' => 39.99,
+                'sku' => 'FL-PLUS-MED',
+                'stock' => 50,
+                'low_stock_threshold' => 10,
+                'is_active' => true,
+                'is_online' => true,
+                'is_instore' => true,
+                'images' => [
+                    'https://images.unsplash.com/photo-1584308666744-24d5c474f2ae?w=800',
+                ],
+                'rating' => 4.9,
+                'reviews_count' => 18,
+                'sales_count' => 64,
+            ]
+        );
+
+        $pharm2 = Product::updateOrCreate(
+            ['slug' => 'nutramax-dasuquin-joint-health-supplement'],
+            [
+                'store_id' => $vetPharmacy->id,
+                'category_id' => $categories['health']->id,
+                'brand_id' => $brands['royal-canin']->id,
+                'name' => 'Nutramax Dasuquin with MSM Joint Health Supplement for Dogs',
+                'description' => 'Advanced joint health formula containing glucosamine, chondroitin sulfate, and avocado/soybean unsaponifiables (ASU).',
+                'pet_type' => 'dog',
+                'price' => 52.50,
+                'discount_price' => null,
+                'sku' => 'DASUQUIN-MSM-84',
+                'stock' => 30,
+                'low_stock_threshold' => 5,
+                'is_active' => true,
+                'is_online' => true,
+                'is_instore' => true,
+                'images' => [
+                    'https://images.unsplash.com/photo-1584017911766-d451b3d0e843?w=800',
+                ],
+                'rating' => 4.8,
+                'reviews_count' => 12,
+                'sales_count' => 38,
+            ]
+        );
+
         // 6. User Address for kaziomar@yopmail.com
         $customerUser = User::where('email', 'kaziomar@yopmail.com')->first();
         if ($customerUser) {
@@ -406,17 +459,110 @@ class MarketplaceSeeder extends Seeder
                 ]
             );
 
-            // Seed Reviews
-            Review::firstOrCreate(
+            // Seed Reviews (for both Products and Stores)
+            // Product Reviews
+            Review::updateOrCreate(
                 ['user_id' => $customerUser->id, 'reviewable_type' => 'product', 'reviewable_id' => $p1->id],
                 [
                     'order_id' => $order1->id,
                     'rating' => 5,
                     'comment' => 'Pedro absolutely loves this Royal Canin formula! His coat is shinier and he finishes his bowl every time.',
-                    
                     'is_anonymous' => false,
                 ]
             );
+
+            Review::updateOrCreate(
+                ['user_id' => $vendorUser->id, 'reviewable_type' => 'product', 'reviewable_id' => $p1->id],
+                [
+                    'rating' => 4,
+                    'comment' => 'High quality dry dog food, great ingredients and reliable nutrition.',
+                    'is_anonymous' => false,
+                ]
+            );
+
+            Review::updateOrCreate(
+                ['user_id' => $customerUser->id, 'reviewable_type' => 'product', 'reviewable_id' => $p2->id],
+                [
+                    'rating' => 5,
+                    'comment' => 'Gentle on our new puppy’s stomach. Great balance of nutrients!',
+                    'is_anonymous' => false,
+                ]
+            );
+
+            Review::updateOrCreate(
+                ['user_id' => $customerUser->id, 'reviewable_type' => 'product', 'reviewable_id' => $p3->id],
+                [
+                    'order_id' => $order2->id,
+                    'rating' => 5,
+                    'comment' => 'My dog loves these daily dental chew sticks! Noticeable breath improvement.',
+                    'is_anonymous' => false,
+                ]
+            );
+
+            Review::updateOrCreate(
+                ['user_id' => $customerUser->id, 'reviewable_type' => 'product', 'reviewable_id' => $pharm1->id],
+                [
+                    'rating' => 5,
+                    'comment' => 'Fast acting flea and tick treatment, totally recommended by our vet.',
+                    'is_anonymous' => false,
+                ]
+            );
+
+            // Store Reviews
+            Review::updateOrCreate(
+                ['user_id' => $customerUser->id, 'reviewable_type' => 'store', 'reviewable_id' => $pawsomeStore->id],
+                [
+                    'order_id' => $order1->id,
+                    'rating' => 5,
+                    'comment' => 'Fantastic local pet shop! Ultra fast 15-minute delivery and great customer care.',
+                    'is_anonymous' => false,
+                ]
+            );
+
+            Review::updateOrCreate(
+                ['user_id' => $vendorUser->id, 'reviewable_type' => 'store', 'reviewable_id' => $pawsomeStore->id],
+                [
+                    'rating' => 5,
+                    'comment' => 'Best pet store in South Congress. Always stocked with premium organic feeds.',
+                    'is_anonymous' => false,
+                ]
+            );
+
+            Review::updateOrCreate(
+                ['user_id' => $customerUser->id, 'reviewable_type' => 'store', 'reviewable_id' => $superPetStore->id],
+                [
+                    'order_id' => $order2->id,
+                    'rating' => 5,
+                    'comment' => 'Great selection of pet accessories and quick fulfillment.',
+                    'is_anonymous' => false,
+                ]
+            );
+
+            Review::updateOrCreate(
+                ['user_id' => $customerUser->id, 'reviewable_type' => 'store', 'reviewable_id' => $vetPharmacy->id],
+                [
+                    'rating' => 5,
+                    'comment' => 'Authentic veterinary medicines and supplements. Very knowledgeable pharmacists.',
+                    'is_anonymous' => false,
+                ]
+            );
+
+            // Update rating & reviews_count columns on models to reflect real DB records
+            foreach (Store::all() as $st) {
+                $count = $st->reviews()->count();
+                $avg = $count > 0 ? round($st->reviews()->avg('rating'), 1) : 5.0;
+                $st->reviews_count = $count;
+                $st->rating = $avg;
+                $st->save();
+            }
+
+            foreach (Product::all() as $pr) {
+                $count = $pr->reviews()->count();
+                $avg = $count > 0 ? round($pr->reviews()->avg('rating'), 1) : 5.0;
+                $pr->reviews_count = $count;
+                $pr->rating = $avg;
+                $pr->save();
+            }
         }
     }
 }
