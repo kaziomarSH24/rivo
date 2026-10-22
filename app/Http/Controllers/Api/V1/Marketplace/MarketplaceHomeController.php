@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Http\Resources\Marketplace\CategoryResource;
 use App\Http\Resources\Marketplace\ProductCardResource;
 use App\Http\Resources\Marketplace\StoreCardResource;
+use App\Http\Resources\Marketplace\StoreProfileResource;
 use App\Http\Resources\Marketplace\MarketplaceHomeResource;
 use App\Models\Product;
 use App\Models\ProductCategory;
@@ -191,18 +192,9 @@ class MarketplaceHomeController extends Controller
      */
     public function storeProfile(Request $request, Store $store): JsonResponse
     {
-        $store->load(['documents']);
-        $reviewSummary = $this->reviewService->getReviewsSummary($store);
+        $profile = $this->storeService->getStoreProfile($store, $request);
 
-        $products = $this->productService->getAll(function ($q) use ($store) {
-            $q->where('store_id', $store->id)->where('is_active', true);
-        });
-
-        return response_success('Store details retrieved successfully.', [
-            'store' => $store,
-            'reviews_summary' => $reviewSummary,
-            'products' => $products,
-        ]);
+        return response_success('Store details retrieved successfully.', new StoreProfileResource($profile));
     }
 
     /**

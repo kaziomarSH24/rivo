@@ -425,4 +425,75 @@ class MarketplaceTest extends TestCase
             $this->assertIsInt($firstStore['products_count']);
         }
     }
+
+    public function test_customer_can_view_store_profile_and_catalog(): void
+    {
+        $response = $this->actingAs($this->customer, 'sanctum')
+            ->getJson("/api/v1/marketplace/stores/{$this->store->id}");
+
+        $response->assertStatus(200)
+            ->assertJson([
+                'ok' => true,
+                'message' => 'Store details retrieved successfully.',
+            ])
+            ->assertJsonStructure([
+                'data' => [
+                    'store' => [
+                        'id',
+                        'name',
+                        'slug',
+                        'type',
+                        'logo',
+                        'banner',
+                        'rating',
+                        'reviews_count',
+                        'delivery_fee',
+                        'delivery_time_text',
+                        'street_address',
+                        'city',
+                        'is_verified',
+                        'is_live',
+                    ],
+                    'categories' => [
+                        '*' => [
+                            'id',
+                            'name',
+                            'slug',
+                            'icon',
+                        ]
+                    ],
+                    'reviews_summary' => [
+                        'rating',
+                        'reviews_count',
+                        'breakdown',
+                        'reviews' => [
+                            'current_page',
+                            'data',
+                            'per_page',
+                            'total',
+                        ],
+                    ],
+                    'products' => [
+                        'data' => [
+                            '*' => [
+                                'id',
+                                'name',
+                                'slug',
+                                'price',
+                                'has_discount',
+                                'primary_image',
+                            ]
+                        ],
+                    ],
+                ]
+            ]);
+
+        // Assert sensitive merchant details are stripped
+        $storeData = $response->json('data.store');
+        $this->assertArrayNotHasKey('user_id', $storeData);
+        $this->assertArrayNotHasKey('owner_name', $storeData);
+        $this->assertArrayNotHasKey('phone', $storeData);
+        $this->assertArrayNotHasKey('email', $storeData);
+        $this->assertArrayNotHasKey('documents', $storeData);
+    }
 }

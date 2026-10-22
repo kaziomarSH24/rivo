@@ -50,27 +50,20 @@ class ReviewService extends BaseService
 
         $rating = max(1, min(5, (int) $data['rating']));
 
-        $review = Review::create([
+        $review = $model->reviews()->create([
             'user_id' => $user->id,
             'order_id' => $data['order_id'] ?? null,
-            'reviewable_type' => get_class($model),
-            'reviewable_id' => $model->id,
             'rating' => $rating,
             'comment' => $data['comment'] ?? null,
             'photos' => $uploadedPhotos,
             'is_anonymous' => filter_var($data['is_anonymous'] ?? false, FILTER_VALIDATE_BOOLEAN),
         ]);
 
-        // Recalculate average rating and reviews_count
-        $avgRating = Review::where('reviewable_type', get_class($model))
-            ->where('reviewable_id', $model->id)
-            ->avg('rating');
+        // Recalculate average rating and reviews_count via relation
+        $avgRating = $model->reviews()->avg('rating') ?: 5.0;
+        $reviewsCount = $model->reviews()->count();
 
-        $reviewsCount = Review::where('reviewable_type', get_class($model))
-            ->where('reviewable_id', $model->id)
-            ->count();
-
-        $model->rating = round($avgRating, 2);
+        $model->rating = round($avgRating, 1);
         $model->reviews_count = $reviewsCount;
         $model->save();
 
@@ -82,8 +75,7 @@ class ReviewService extends BaseService
      */
     public function getReviewsSummary(Model $model): array
     {
-        $reviewsQuery = Review::where('reviewable_type', get_class($model))
-            ->where('reviewable_id', $model->id);
+        $reviewsQuery = $model->reviews();
 
         $totalCount = (clone $reviewsQuery)->count();
         $avgRating = $totalCount > 0 ? round((clone $reviewsQuery)->avg('rating'), 1) : 5.0;
@@ -93,7 +85,8 @@ class ReviewService extends BaseService
         for ($star = 5; $star >= 1; $star--) {
             $starCount = (clone $reviewsQuery)->where('rating', $star)->count();
             $percentage = $totalCount > 0 ? round(($starCount / $totalCount) * 100) : 0;
-            $breakdown[$star] = [
+            $breakdown[(string) $star] = [
+                'star' => $star,
                 'count' => $starCount,
                 'percentage' => $percentage,
             ];
@@ -104,23 +97,37 @@ class ReviewService extends BaseService
             ->latest()
             ->paginate(15);
 
-        // Hide user name if anonymous
-        $reviewsList->getCollection()->transform(function ($r) {
-            if ($r->is_anonymous) {
-                $r->user = [
-                    'id' => null,
-                    'name' => 'Anonymous User',
-                    'avatar' => null,
-                ];
-            }
-            return $r;
+        // Format reviews list cleanly with avatars and relative timestamps
+        $formattedReviews = $reviewsList->getCollection()->map(function ($r) {
+            $userName = $r->is_anonymous ? 'Anonymous User' : ($r->user?->name ?? 'Customer');
+            $userAvatar = $r->is_anonymous ? null : format_media_url($r->user?->avatar, 'avatars');
+
+            return [
+                'id' => $r->id,
+                'user' => [
+                    'id' => $r->is_anonymous ? null : $r->user?->id,
+                    'name' => $userName,
+                    'avatar' => $userAvatar,
+                ],
+                'rating' => (int) $r->rating,
+                'comment' => $r->comment,
+                'photos' => array_map(fn($p) => format_media_url($p, 'reviews'), $r->photos ?? []),
+                'created_at' => $r->created_at?->toIso8601String(),
+                'created_at_human' => $r->created_at?->diffForHumans() ?? 'recently',
+            ];
         });
 
         return [
             'rating' => $avgRating,
             'reviews_count' => $totalCount,
-            'breakdown' => $breakdown,
-            'reviews' => $reviewsList,
+            'breakdown' => (object) $breakdown,
+            'reviews' => [
+                'current_page' => $reviewsList->currentPage(),
+                'data' => $formattedReviews->values()->all(),
+                'per_page' => $reviewsList->perPage(),
+                'total' => $reviewsList->total(),
+                'last_page' => $reviewsList->lastPage(),
+            ],
         ];
     }
 }

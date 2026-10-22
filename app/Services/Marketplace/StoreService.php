@@ -4,9 +4,13 @@ namespace App\Services\Marketplace;
 
 use App\Models\Order;
 use App\Models\Product;
+use App\Models\ProductCategory;
 use App\Models\Store;
 use App\Models\StoreDocument;
 use App\Models\User;
+use App\Http\Resources\Marketplace\ProductCardResource;
+use App\Services\Marketplace\ProductService;
+use App\Services\Marketplace\ReviewService;
 use App\Services\BaseService;
 use App\Traits\FileUploadTrait;
 use Spatie\QueryBuilder\AllowedFilter;
@@ -263,4 +267,42 @@ class StoreService extends BaseService
             'best_sellers' => $bestSellers,
         ];
     }
+
+    /**
+     * Get store public profile data including categories, review breakdown, and products
+     */
+    public function getStoreProfile(Store $store, Request $request): array
+    {
+        // 1. Categories available in this specific store (for "Browse Categories" carousel)
+        $categoryIds = Product::where('store_id', $store->id)
+            ->where('is_active', true)
+            ->distinct()
+            ->pluck('category_id');
+
+        $categories = ProductCategory::whereIn('id', $categoryIds)
+            ->where('is_active', true)
+            ->orderBy('order_column')
+            ->get();
+
+        // 2. Reviews summary & 5-star breakdown via polymorphic relation
+        $reviewsSummary = app(ReviewService::class)->getReviewsSummary($store);
+
+        // 3. Products in this store with filtering (e.g. ?category_id=...) & sorting
+        $products = app(ProductService::class)->getAll(function ($q) use ($store, $request) {
+            $q->where('store_id', $store->id)->where('is_active', true);
+            if ($request->filled('category_id')) {
+                $q->where('category_id', $request->input('category_id'));
+            }
+        });
+
+        $paginatedProducts = ProductCardResource::collection($products)->response()->getData(true);
+
+        return [
+            'store' => $store,
+            'categories' => $categories,
+            'reviews_summary' => $reviewsSummary,
+            'products' => $paginatedProducts,
+        ];
+    }
+
 }
