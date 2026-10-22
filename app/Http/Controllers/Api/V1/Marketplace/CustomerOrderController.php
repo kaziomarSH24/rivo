@@ -3,6 +3,8 @@
 namespace App\Http\Controllers\Api\V1\Marketplace;
 
 use App\Http\Controllers\Controller;
+use App\Http\Resources\Marketplace\OrderCardResource;
+use App\Http\Resources\Marketplace\OrderDetailsResource;
 use App\Models\Order;
 use App\Services\Marketplace\OrderService;
 use Illuminate\Http\JsonResponse;
@@ -24,10 +26,11 @@ class CustomerOrderController extends Controller
     public function index(Request $request): JsonResponse
     {
         $orders = $this->orderService->getAll(function ($query) use ($request) {
-            $query->where('user_id', $request->user()->id);
+            $query->where('user_id', $request->user()->id)
+                ->with(['store:id,name,slug,logo', 'items']);
         });
 
-        return response_success('Orders retrieved successfully.', $orders);
+        return response_success('Orders retrieved successfully.', OrderCardResource::collection($orders)->response()->getData(true));
     }
 
     /**
@@ -39,9 +42,9 @@ class CustomerOrderController extends Controller
             return response_error('Unauthorized access to this order.', [], 403);
         }
 
-        $order->load(['store:id,name,logo,phone,street_address', 'items', 'address', 'reviews', 'transaction']);
+        $order->load(['store:id,name,slug,logo,phone,street_address', 'items', 'address', 'transaction']);
 
-        return response_success('Order details retrieved successfully.', $order);
+        return response_success('Order details retrieved successfully.', new OrderDetailsResource($order));
     }
 
     /**
@@ -53,7 +56,7 @@ class CustomerOrderController extends Controller
             $reason = $request->input('reason', 'Cancelled by customer');
             $cancelledOrder = $this->orderService->customerCancelOrder($request->user(), $order, $reason);
 
-            return response_success('Order cancelled successfully and inventory restored.', $cancelledOrder);
+            return response_success('Order cancelled successfully and inventory restored.', new OrderDetailsResource($cancelledOrder));
         } catch (\Exception $e) {
             return response_error($e->getMessage(), [], 422);
         }

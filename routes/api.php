@@ -74,6 +74,8 @@ Route::prefix('v1/auth')->name('api.v1.auth.')->controller(PasswordController::c
 
 // Webhooks
 Route::post('v1/webhooks/revenuecat', [RevenueCatWebhookController::class, 'handle']);
+Route::post('stripe/webhook', [\Laravel\Cashier\Http\Controllers\WebhookController::class, 'handleWebhook']);
+Route::post('v1/webhooks/stripe', [\Laravel\Cashier\Http\Controllers\WebhookController::class, 'handleWebhook']);
 
 
 // ==========================================

@@ -27,3 +27,29 @@ Route::get('/lander', function (Request $request) {
 })->name('lander');
 
 
+
+// Marketplace Live Stripe Checkout & Payment Test
+Route::get('/marketplace/checkout-test', function () {
+    if (app()->environment('production')) {
+        abort(404);
+    }
+    $user = \App\Models\User::first();
+    $token = $user ? $user->createToken('test-blade-token')->plainTextToken : null;
+    $cart = \App\Models\Cart::where('user_id', $user?->id)->with('items.product')->first();
+
+    // Ensure cart has at least 1 item for testing
+    if ($user && (!$cart || $cart->items->isEmpty())) {
+        $product = \App\Models\Product::first();
+        if ($product) {
+            $cartService = app(\App\Services\Marketplace\CartService::class);
+            $cartService->addItem($user, $product->id, null, 1);
+            $cart = \App\Models\Cart::where('user_id', $user->id)->with('items.product')->first();
+        }
+    }
+
+    $products = \App\Models\Product::with(['store', 'variants'])->where('is_active', true)->take(25)->get();
+    $addresses = $user ? \App\Models\UserAddress::where('user_id', $user->id)->get() : collect();
+    $stripeKey = config('cashier.key');
+
+    return view('marketplace.checkout_test', compact('user', 'token', 'cart', 'products', 'addresses', 'stripeKey'));
+});

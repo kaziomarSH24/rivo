@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api\V1\Marketplace;
 
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Marketplace\CheckoutRequest;
+use App\Http\Resources\Marketplace\OrderDetailsResource;
 use App\Models\Order;
 use App\Services\Marketplace\CartService;
 use App\Services\Marketplace\OrderService;
@@ -33,7 +34,10 @@ class CheckoutController extends Controller
                 $this->cartService
             );
 
-            return response_success('Order placed successfully.', $result, 201);
+            return response_success('Order placed successfully.', [
+                'order' => new OrderDetailsResource($result['order']),
+                'payment' => $result['payment'],
+            ], 201);
         } catch (\Exception $e) {
             return response_error($e->getMessage(), [], 422);
         }
@@ -56,10 +60,13 @@ class CheckoutController extends Controller
             );
 
             if ($result['success']) {
-                return response_success($result['message'], $result['order']);
+                return response_success(
+                    $result['message'],
+                    new OrderDetailsResource($result['order'])
+                );
             }
 
-            return response_error($result['message'], ['order' => $result['order']], 422);
+            return response_error($result['message'], ['order' => new OrderDetailsResource($result['order'])], 422);
         } catch (\Exception $e) {
             return response_error($e->getMessage(), [], 422);
         }

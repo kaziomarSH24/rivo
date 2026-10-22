@@ -4,6 +4,8 @@ namespace App\Providers;
 
 // use App\Models\Product;
 // use App\Observers\ProductObserver;
+use App\Services\Payment\Contracts\PaymentGatewayInterface;
+use App\Services\Payment\PaymentGatewayManager;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\ServiceProvider;
 use App\Models\Product;
@@ -18,12 +20,12 @@ class AppServiceProvider extends ServiceProvider
      */
     public function register(): void
     {
-        $this->app->singleton(\App\Services\Payment\PaymentGatewayManager::class, function ($app) {
-            return new \App\Services\Payment\PaymentGatewayManager();
+        $this->app->singleton(PaymentGatewayManager::class, function ($app) {
+            return new PaymentGatewayManager();
         });
 
-        $this->app->bind(\App\Services\Payment\Contracts\PaymentGatewayInterface::class, function ($app) {
-            return $app->make(\App\Services\Payment\PaymentGatewayManager::class)->gateway();
+        $this->app->bind(PaymentGatewayInterface::class, function ($app) {
+            return $app->make(PaymentGatewayManager::class)->gateway();
         });
     }
 

@@ -13,8 +13,6 @@ use App\Models\UserAddress;
 use App\Services\BaseService;
 use App\Services\Payment\PaymentGatewayManager;
 use Carbon\Carbon;
-use Illuminate\Database\Eloquent\Builder;
-use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Spatie\QueryBuilder\AllowedFilter;
@@ -70,13 +68,22 @@ class OrderService extends BaseService
         return DB::transaction(function () use ($user, $data, $cartData, $cart, $cartService, $paymentManager, $paymentMethod) {
             $store = $cart->store;
 
-            // Validate delivery address ownership
+            // Validate or auto-resolve delivery address
             $address = null;
             if (!empty($data['address_id'])) {
                 $address = UserAddress::where('id', $data['address_id'])->where('user_id', $user->id)->first();
                 if (!$address) {
                     throw new \Exception('The selected delivery address does not exist or does not belong to your account.');
                 }
+            } elseif (empty($data['delivery_address'])) {
+                // Auto-fallback: User's default address or most recent saved address
+                $address = UserAddress::where('user_id', $user->id)->where('is_default', true)->first()
+                    ?? UserAddress::where('user_id', $user->id)->latest()->first();
+            }
+
+            $deliveryType = $data['delivery_type'] ?? 'express';
+            if ($deliveryType !== 'pickup' && !$address && empty($data['delivery_address'])) {
+                throw new \Exception('A delivery address is required. Please select or add an address to continue.');
             }
 
             $addressJson = $address ? [
@@ -86,6 +93,8 @@ class OrderService extends BaseService
                 'city' => $address->city,
                 'state' => $address->state,
                 'zip_code' => $address->zip_code,
+                'latitude' => $address->latitude,
+                'longitude' => $address->longitude,
             ] : ($data['delivery_address'] ?? null);
 
             // Pre-validate inventory stock for all cart items
@@ -102,6 +111,26 @@ class OrderService extends BaseService
 
             $orderNumber = 'RIV-' . strtoupper(Str::random(5));
 
+            $deliveryType = $data['delivery_type'] ?? 'express';
+            $isPro = $user->isPro();
+            $baseStoreFee = (float) ($store->delivery_fee ?: 4.99);
+
+            if ($deliveryType === 'pickup') {
+                $deliveryFee = 0.0;
+                $estimatedDeliveryTime = 'Ready for pickup in ~15 min';
+            } elseif ($deliveryType === 'standard') {
+                $deliveryFee = $isPro ? 0.0 : $baseStoreFee;
+                $estimatedDeliveryTime = '~45-60 min';
+            } else { // express priority
+                $deliveryFee = $isPro ? 0.0 : round($baseStoreFee + 2.99, 2);
+                $estimatedDeliveryTime = $store->delivery_time_text ?: '15-20 min';
+            }
+
+            $subtotal = (float) $cartData['summary']['subtotal'];
+            $discount = (float) $cartData['summary']['discount'];
+            $tax = (float) $cartData['summary']['tax'];
+            $total = max(0, round($subtotal + $deliveryFee + $tax - $discount, 2));
+
             $order = Order::create([
                 'order_number' => $orderNumber,
                 'user_id' => $user->id,
@@ -109,13 +138,13 @@ class OrderService extends BaseService
                 'address_id' => $address ? $address->id : null,
                 'delivery_address_json' => $addressJson,
                 'status' => 'new',
-                'delivery_type' => $data['delivery_type'] ?? 'express',
-                'estimated_delivery_time' => $store->delivery_time_text ?: '~15 min',
-                'subtotal' => $cartData['summary']['subtotal'],
-                'delivery_fee' => $cartData['summary']['delivery_fee'],
-                'tax' => $cartData['summary']['tax'],
-                'discount' => $cartData['summary']['discount'],
-                'total' => $cartData['summary']['total'],
+                'delivery_type' => $deliveryType,
+                'estimated_delivery_time' => $estimatedDeliveryTime,
+                'subtotal' => $subtotal,
+                'delivery_fee' => $deliveryFee,
+                'tax' => $tax,
+                'discount' => $discount,
+                'total' => $total,
                 'payment_method' => $paymentMethod,
                 'payment_status' => 'pending',
                 'notes' => $data['notes'] ?? null,

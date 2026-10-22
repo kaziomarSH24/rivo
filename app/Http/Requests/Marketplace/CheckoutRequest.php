@@ -20,7 +20,7 @@ class CheckoutRequest extends BaseRequest
                     }
                 }),
             ],
-            'delivery_address' => 'required_without:address_id|nullable|array',
+            'delivery_address' => 'nullable|array',
             'delivery_address.street_address' => 'required_with:delivery_address|string|max:255',
             'delivery_address.house_no' => 'nullable|string|max:100',
             'delivery_address.landmark' => 'nullable|string|max:255',

@@ -3,6 +3,23 @@
 use Laravel\Cashier\Console\WebhookCommand;
 use Laravel\Cashier\Invoices\DompdfInvoiceRenderer;
 
+$readEnvKey = function ($key) {
+    $val = env($key);
+    if (!empty($val) && !str_ends_with($val, '...')) {
+        return $val;
+    }
+    $file = base_path('.env');
+    if (file_exists($file)) {
+        foreach (file($file) as $line) {
+            $line = trim($line);
+            if ($line && strpos($line, '#') !== 0 && strpos($line, $key . '=') === 0) {
+                return trim(substr($line, strlen($key) + 1), " \t\n\rreturn [\x0B\"'");
+            }
+        }
+    }
+    return $val;
+};
+
 return [
 
     /*
@@ -16,9 +33,9 @@ return [
     |
     */
 
-    'key' => env('STRIPE_KEY'),
+    'key' => $readEnvKey('STRIPE_KEY'),
 
-    'secret' => env('STRIPE_SECRET'),
+    'secret' => $readEnvKey('STRIPE_SECRET'),
 
     /*
     |--------------------------------------------------------------------------
@@ -45,7 +62,7 @@ return [
     */
 
     'webhook' => [
-        'secret' => env('STRIPE_WEBHOOK_SECRET'),
+        'secret' => $readEnvKey('STRIPE_WEBHOOK_SECRET'),
         'tolerance' => env('STRIPE_WEBHOOK_TOLERANCE', 300),
         'events' => WebhookCommand::DEFAULT_EVENTS,
     ],

@@ -30,6 +30,11 @@ return Application::configure(basePath: dirname(__DIR__))
         }
     )
     ->withMiddleware(function (Middleware $middleware) {
+        $middleware->validateCsrfTokens(except: [
+            'stripe/*',
+            'api/stripe/*',
+        ]);
+
         $middleware->alias([
             'pro' => \App\Http\Middleware\CheckProSubscription::class,
         ]);

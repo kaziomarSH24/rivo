@@ -55,6 +55,10 @@ class StripePaymentGateway implements PaymentGatewayInterface
 
         // Local development sandbox fallback if Stripe secret is placeholder (sk_test_...)
         if ($this->isDummyKey()) {
+            if (app()->environment('production')) {
+                Log::critical('SECURITY ERROR: Stripe dummy keys or simulated orders are strictly forbidden in production environment.');
+                throw new Exception('Stripe is not configured with valid live credentials in production environment.');
+            }
             $mockIntentId = 'pi_sim_' . Str::random(24);
             $mockClientSecret = $mockIntentId . '_secret_' . Str::random(24);
 
@@ -63,6 +67,25 @@ class StripePaymentGateway implements PaymentGatewayInterface
                 'payment_method' => 'stripe',
                 'payment_status' => 'pending',
             ]);
+
+            Transaction::updateOrCreate(
+                ['payment_intent_id' => $mockIntentId],
+                [
+                    'user_id' => $order->user_id,
+                    'payable_id' => $order->id,
+                    'payable_type' => Order::class,
+                    'gateway' => 'stripe',
+                    'gateway_transaction_id' => $mockIntentId,
+                    'amount' => $order->total,
+                    'currency' => 'usd',
+                    'status' => 'pending',
+                    'metadata' => [
+                        'order_number' => $order->order_number,
+                        'payment_method_type' => 'card',
+                        'mode' => 'sandbox_simulated',
+                    ],
+                ]
+            );
 
             return PaymentResult::requiresAction(
                 gateway: 'stripe',
@@ -130,10 +153,31 @@ class StripePaymentGateway implements PaymentGatewayInterface
                 'payment_method' => 'stripe',
             ]);
 
+            // Record initial transaction record
+            $isPaidImmediately = ($intent->status === 'succeeded');
+            $status = $isPaidImmediately ? 'success' : 'pending';
+
+            Transaction::updateOrCreate(
+                ['payment_intent_id' => $intent->id],
+                [
+                    'user_id' => $order->user_id,
+                    'payable_id' => $order->id,
+                    'payable_type' => Order::class,
+                    'gateway' => 'stripe',
+                    'gateway_transaction_id' => !empty($intent->charges->data) ? $intent->charges->data[0]->id : $intent->id,
+                    'amount' => $order->total,
+                    'currency' => $intent->currency ?: $currency,
+                    'status' => $status,
+                    'metadata' => [
+                        'order_number' => $order->order_number,
+                        'payment_method_type' => !empty($intent->payment_method_types) ? $intent->payment_method_types[0] : 'card',
+                    ],
+                ]
+            );
+
             // If payment succeeded immediately
-            if ($intent->status === 'succeeded') {
+            if ($isPaidImmediately) {
                 $order->update(['payment_status' => 'paid']);
-                $this->recordTransaction($order, $intent);
 
                 return PaymentResult::success(
                     gateway: 'stripe',
@@ -179,8 +223,16 @@ class StripePaymentGateway implements PaymentGatewayInterface
             return false;
         }
 
-        // Sandbox simulated verification
-        if ($this->isDummyKey() || str_starts_with($intentId, 'pi_sim_') || str_starts_with($intentId, 'pi_test_')) {
+        // Security guard: In production, NEVER allow dummy keys or simulated payment intents to mark an order as paid!
+        if (app()->environment('production')) {
+            if ($this->isDummyKey() || str_starts_with($intentId, 'pi_sim_') || str_starts_with($intentId, 'pi_test_')) {
+                Log::critical("SECURITY ALERT: Simulated dummy payment confirmation attempt blocked in production for order #{$order->id} (intent: {$intentId})");
+                return false;
+            }
+        }
+
+        // Sandbox simulated verification (ONLY permitted in local/testing/development environments)
+        if (!app()->environment('production') && ($this->isDummyKey() || str_starts_with($intentId, 'pi_sim_') || str_starts_with($intentId, 'pi_test_'))) {
             $order->update([
                 'payment_status' => 'paid',
                 'transaction_id' => $intentId,
@@ -245,8 +297,19 @@ class StripePaymentGateway implements PaymentGatewayInterface
             ];
         }
 
-        // Sandbox simulation
-        if ($this->isDummyKey() || str_starts_with($order->transaction_id, 'pi_sim_') || str_starts_with($order->transaction_id, 'pi_test_')) {
+        // Security guard: In production, simulated dummy refund is strictly forbidden
+        if (app()->environment('production')) {
+            if ($this->isDummyKey() || str_starts_with($order->transaction_id, 'pi_sim_') || str_starts_with($order->transaction_id, 'pi_test_')) {
+                Log::critical("SECURITY ALERT: Simulated dummy refund attempt blocked in production for order #{$order->id}");
+                return [
+                    'success' => false,
+                    'message' => 'Simulated refunds are strictly forbidden in production environment.',
+                ];
+            }
+        }
+
+        // Sandbox simulation (ONLY permitted in local/testing/development)
+        if (!app()->environment('production') && ($this->isDummyKey() || str_starts_with($order->transaction_id, 'pi_sim_') || str_starts_with($order->transaction_id, 'pi_test_'))) {
             $order->update(['payment_status' => 'refunded']);
 
             $transaction = Transaction::where('payment_intent_id', $order->transaction_id)->first();
