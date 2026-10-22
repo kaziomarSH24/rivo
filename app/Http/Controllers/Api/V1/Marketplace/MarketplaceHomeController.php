@@ -3,11 +3,13 @@
 namespace App\Http\Controllers\Api\V1\Marketplace;
 
 use App\Http\Controllers\Controller;
-use App\Models\Pet;
+use App\Http\Resources\Marketplace\CategoryResource;
+use App\Http\Resources\Marketplace\MarketplaceHomeResource;
 use App\Models\Product;
 use App\Models\ProductCategory;
 use App\Models\RecentSearch;
 use App\Models\Store;
+use App\Services\Marketplace\MarketplaceHomeService;
 use App\Services\Marketplace\ProductService;
 use App\Services\Marketplace\ReviewService;
 use App\Services\Marketplace\StoreService;
@@ -17,15 +19,18 @@ use Illuminate\Support\Facades\DB;
 
 class MarketplaceHomeController extends Controller
 {
+    protected MarketplaceHomeService $homeService;
     protected ProductService $productService;
     protected StoreService $storeService;
     protected ReviewService $reviewService;
 
     public function __construct(
+        MarketplaceHomeService $homeService,
         ProductService $productService,
         StoreService $storeService,
         ReviewService $reviewService
     ) {
+        $this->homeService = $homeService;
         $this->productService = $productService;
         $this->storeService = $storeService;
         $this->reviewService = $reviewService;
@@ -33,72 +38,13 @@ class MarketplaceHomeController extends Controller
 
     /**
      * Marketplace Home Feed matching Figma Discovery screen
+     * Delegated to MarketplaceHomeService and formatted with MarketplaceHomeResource
      */
     public function index(Request $request): JsonResponse
     {
-        $user = $request->user();
+        $feed = $this->homeService->getHomeFeed($request->user());
 
-        // 1. Current Delivery Address
-        $defaultAddress = $user ? $user->addresses()->where('is_default', true)->first() : null;
-        if (!$defaultAddress && $user) {
-            $defaultAddress = $user->addresses()->latest()->first();
-        }
-
-        // 2. Active Pet for personalized recommendations (e.g. Pedro)
-        $activePet = null;
-        if ($user) {
-            $activePet = Pet::where('user_id', $user->id)->first();
-        }
-
-        // 3. Categories with product counts
-        $categories = ProductCategory::query()
-            ->where('is_active', true)
-            ->withCount('products')
-            ->orderBy('order_column')
-            ->get();
-
-        // 4. Popular Stores near user
-        $popularStores = Store::where('is_live', true)
-            ->where('is_verified', true)
-            ->orderByDesc('rating')
-            ->orderByDesc('reviews_count')
-            ->limit(6)
-            ->get();
-
-        // 5. "Products for Pedro" (Personalized for active pet)
-        $petProducts = $this->productService->getRecommendedForPet($activePet, 8);
-
-        // 6. Top Deals / Discounted products
-        $topDeals = Product::where('is_active', true)
-            ->whereNotNull('discount_price')
-            ->where('discount_price', '>', 0)
-            ->where('stock', '>', 0)
-            ->with(['brand', 'store'])
-            ->limit(8)
-            ->get();
-
-        return response_success('Marketplace home feed retrieved successfully.', [
-            'delivery_address' => $defaultAddress ? [
-                'id' => $defaultAddress->id,
-                'title' => $defaultAddress->title,
-                'street_address' => $defaultAddress->street_address,
-                'city' => $defaultAddress->city,
-                'is_default' => (bool) $defaultAddress->is_default,
-            ] : null,
-            'pro_banner' => [
-                'title' => 'Rivo Pro',
-                'subtitle' => 'Unlimited $0 Delivery Fee',
-                'badge' => 'Active Member Benefit',
-            ],
-            'categories' => $categories,
-            'popular_stores' => $popularStores,
-            'recommended_for_pet' => [
-                'pet_name' => $activePet ? $activePet->name : 'Your Pet',
-                'pet_type' => $activePet ? $activePet->type : 'dog',
-                'products' => $petProducts,
-            ],
-            'top_deals' => $topDeals,
-        ]);
+        return response_success('Marketplace home feed retrieved successfully.', new MarketplaceHomeResource($feed));
     }
 
     /**
@@ -151,7 +97,7 @@ class MarketplaceHomeController extends Controller
             ->orderBy('order_column')
             ->get();
 
-        return response_success('Product categories retrieved successfully.', $categories);
+        return response_success('Product categories retrieved successfully.', CategoryResource::collection($categories));
     }
 
     /**
