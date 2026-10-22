@@ -7,6 +7,7 @@ use App\Http\Resources\Marketplace\CategoryResource;
 use App\Http\Resources\Marketplace\ProductCardResource;
 use App\Http\Resources\Marketplace\StoreCardResource;
 use App\Http\Resources\Marketplace\StoreProfileResource;
+use App\Http\Resources\Marketplace\ProductDetailsResource;
 use App\Http\Resources\Marketplace\MarketplaceHomeResource;
 use App\Models\Product;
 use App\Models\ProductCategory;
@@ -202,12 +203,12 @@ class MarketplaceHomeController extends Controller
      */
     public function productDetails(Request $request, Product $product): JsonResponse
     {
-        $product->load(['store:id,name,logo,rating,delivery_time_text,delivery_fee', 'category', 'brand', 'variants']);
+        $product->load(['store', 'category', 'brand', 'variants']);
         $reviewsSummary = $this->reviewService->getReviewsSummary($product);
 
-        return response_success('Product details retrieved successfully.', [
+        return response_success('Product details retrieved successfully.', new ProductDetailsResource([
             'product' => $product,
             'reviews_summary' => $reviewsSummary,
-        ]);
+        ]));
     }
 }

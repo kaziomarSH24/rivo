@@ -53,6 +53,8 @@ class ProductCardResource extends JsonResource
                     'id' => $this->store->id,
                     'name' => $this->store->name,
                     'slug' => $this->store->slug,
+                    'rating' => (float) $this->store->rating,
+                    'reviews_count' => (int) $this->store->reviews_count,
                     'delivery_time_text' => $this->store->delivery_time_text ?: '~15 min',
                     'delivery_fee' => (float) $this->store->delivery_fee,
                     'logo' => format_media_url($this->store->logo, 'stores/logos'),

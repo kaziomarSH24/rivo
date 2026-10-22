@@ -496,4 +496,50 @@ class MarketplaceTest extends TestCase
         $this->assertArrayNotHasKey('email', $storeData);
         $this->assertArrayNotHasKey('documents', $storeData);
     }
+
+    public function test_customer_can_view_product_details_with_resource_formatting(): void
+    {
+        $response = $this->actingAs($this->customer, 'sanctum')
+            ->getJson("/api/v1/marketplace/products/{$this->product->id}");
+
+        $response->assertStatus(200)
+            ->assertJson([
+                'ok' => true,
+                'message' => 'Product details retrieved successfully.',
+            ])
+            ->assertJsonStructure([
+                'data' => [
+                    'product' => [
+                        'id',
+                        'name',
+                        'slug',
+                        'price',
+                        'discount_price',
+                        'has_discount',
+                        'discount_percentage',
+                        'stock',
+                        'is_in_stock',
+                        'primary_image',
+                        'images',
+                        'rating',
+                        'reviews_count',
+                        'brand' => ['id', 'name', 'slug'],
+                        'store' => ['id', 'name', 'slug', 'rating', 'reviews_count', 'delivery_time_text', 'delivery_fee'],
+                        'category' => ['id', 'name', 'slug', 'icon'],
+                        'variants',
+                    ],
+                    'reviews_summary' => [
+                        'rating',
+                        'reviews_count',
+                        'breakdown',
+                        'reviews',
+                    ],
+                ]
+            ]);
+
+        $productData = $response->json('data.product');
+        $this->assertArrayNotHasKey('deleted_at', $productData);
+        $this->assertArrayNotHasKey('low_stock_threshold', $productData);
+        $this->assertArrayNotHasKey('is_active', $productData);
+    }
 }
