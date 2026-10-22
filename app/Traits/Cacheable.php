@@ -105,13 +105,10 @@ trait Cacheable
         $safeArguments = array_map($normalize, $arguments);
         $argumentString = serialize($safeArguments);
 
-        // Handle Request Queries for exact match in lists
-        $queryString = '';
-        if ($method === 'getAll' || $method === 'paginate') {
-            $queryParams = request()->query();
-            ksort($queryParams);
-            $queryString = request()->path() . ":" . serialize($queryParams);
-        }
+        // Handle Request Queries for exact match in lists and queries
+        $queryParams = request()->query();
+        ksort($queryParams);
+        $queryString = request()->path() . ":" . serialize($queryParams);
 
         // SHA-256 hash creates a fast, unique, and perfectly safe key for complex parameters
         $keyParts[] = hash('sha256', $argumentString . $queryString);
