@@ -9,6 +9,7 @@ use App\Models\Product;
 use App\Models\ProductCategory;
 use App\Models\RecentSearch;
 use App\Models\Store;
+use App\Services\Marketplace\CategoryService;
 use App\Services\Marketplace\MarketplaceHomeService;
 use App\Services\Marketplace\ProductService;
 use App\Services\Marketplace\ReviewService;
@@ -23,17 +24,20 @@ class MarketplaceHomeController extends Controller
     protected ProductService $productService;
     protected StoreService $storeService;
     protected ReviewService $reviewService;
+    protected CategoryService $categoryService;
 
     public function __construct(
         MarketplaceHomeService $homeService,
         ProductService $productService,
         StoreService $storeService,
-        ReviewService $reviewService
+        ReviewService $reviewService,
+        CategoryService $categoryService
     ) {
         $this->homeService = $homeService;
         $this->productService = $productService;
         $this->storeService = $storeService;
         $this->reviewService = $reviewService;
+        $this->categoryService = $categoryService;
     }
 
     /**
@@ -88,14 +92,7 @@ class MarketplaceHomeController extends Controller
      */
     public function categories(): JsonResponse
     {
-        $categories = ProductCategory::query()
-            ->where('is_active', true)
-            ->with(['children' => function ($q) {
-                $q->where('is_active', true)->withCount('products');
-            }])
-            ->withCount('products')
-            ->orderBy('order_column')
-            ->get();
+        $categories = $this->categoryService->getActiveCategories();
 
         return response_success('Product categories retrieved successfully.', CategoryResource::collection($categories));
     }

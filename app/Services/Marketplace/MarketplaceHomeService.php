@@ -4,17 +4,20 @@ namespace App\Services\Marketplace;
 
 use App\Models\Pet;
 use App\Models\Product;
-use App\Models\ProductCategory;
 use App\Models\Store;
 use App\Models\User;
 
 class MarketplaceHomeService
 {
     protected ProductService $productService;
+    protected CategoryService $categoryService;
 
-    public function __construct(ProductService $productService)
-    {
+    public function __construct(
+        ProductService $productService,
+        CategoryService $categoryService
+    ) {
         $this->productService = $productService;
+        $this->categoryService = $categoryService;
     }
 
     /**
@@ -41,12 +44,8 @@ class MarketplaceHomeService
             }
         }
 
-        // 3. Categories with active product counts
-        $categories = ProductCategory::query()
-            ->where('is_active', true)
-            ->withCount('products')
-            ->orderBy('order_column')
-            ->get();
+        // 3. Categories with active product counts (Delegated to CategoryService)
+        $categories = $this->categoryService->getActiveCategories();
 
         // 4. Popular Stores near user
         $popularStores = Store::where('is_live', true)

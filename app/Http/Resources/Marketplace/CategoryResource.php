@@ -13,6 +13,7 @@ class CategoryResource extends JsonResource
             'id' => $this->id,
             'name' => $this->name,
             'slug' => $this->slug,
+            'subtitle' => $this->subtitle,
             'icon' => format_media_url($this->icon, 'categories'),
             'order_column' => $this->order_column,
             'products_count' => (int) ($this->products_count ?? 0),

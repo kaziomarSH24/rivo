@@ -150,6 +150,30 @@ class MarketplaceTest extends TestCase
         $this->assertEquals('https://images.unsplash.com/sample', $targetProd['images'][1]);
     }
 
+    public function test_customer_can_retrieve_categories_list(): void
+    {
+        $response = $this->actingAs($this->customer, 'sanctum')->getJson('/api/v1/marketplace/categories');
+
+        $response->assertStatus(200)
+            ->assertJson([
+                'ok' => true,
+                'message' => 'Product categories retrieved successfully.',
+            ])
+            ->assertJsonStructure([
+                'data' => [
+                    '*' => [
+                        'id',
+                        'name',
+                        'slug',
+                        'subtitle',
+                        'icon',
+                        'order_column',
+                        'products_count',
+                    ]
+                ]
+            ]);
+    }
+
     public function test_customer_can_search_products_and_stores(): void
     {
         $response = $this->actingAs($this->customer, 'sanctum')->getJson('/api/v1/marketplace/search?q=Dog');
