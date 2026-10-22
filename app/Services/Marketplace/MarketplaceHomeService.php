@@ -123,13 +123,20 @@ class MarketplaceHomeService
             ->pluck('query')
             ->toArray();
 
-        if (empty($popularTags)) {
-            $popularTags = ProductCategory::where('is_active', true)
-                ->orderBy('order_column')
-                ->limit(6)
-                ->pluck('name')
-                ->toArray();
-        }
+        // Blend with curated trending pet categories and popular search keywords
+        $categoryTags = ProductCategory::where('is_active', true)
+            ->orderBy('order_column')
+            ->limit(6)
+            ->pluck('name')
+            ->toArray();
+
+        $defaultTrending = array_merge(
+            ['Royal Canin', 'Puppy Formula', 'Dental Chews', 'Flea & Tick', 'Memory Foam Bed'],
+            $categoryTags
+        );
+
+        $popularTags = array_values(array_unique(array_merge($popularTags, $defaultTrending)));
+        $popularTags = array_slice($popularTags, 0, 8);
 
         // 4. Search products & stores via BaseService
         $products = [];
