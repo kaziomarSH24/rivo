@@ -174,6 +174,46 @@ class MarketplaceTest extends TestCase
             ]);
     }
 
+    public function test_customer_can_retrieve_products_by_category(): void
+    {
+        $category = ProductCategory::where('slug', 'test-food')->first();
+
+        $response = $this->actingAs($this->customer, 'sanctum')
+            ->getJson("/api/v1/marketplace/categories/{$category->id}/products?include=store,brand");
+
+        $response->assertStatus(200)
+            ->assertJson([
+                'ok' => true,
+            ])
+            ->assertJsonStructure([
+                'data' => [
+                    'data' => [
+                        '*' => [
+                            'id',
+                            'name',
+                            'slug',
+                            'price',
+                            'has_discount',
+                            'discount_percentage',
+                            'primary_image',
+                            'images',
+                            'store' => [
+                                'id',
+                                'name',
+                                'slug',
+                            ],
+                            'brand',
+                        ]
+                    ],
+                    'links',
+                    'meta' => [
+                        'current_page',
+                        'total',
+                    ]
+                ]
+            ]);
+    }
+
     public function test_customer_can_search_products_and_stores(): void
     {
         $response = $this->actingAs($this->customer, 'sanctum')->getJson('/api/v1/marketplace/search?q=Dog');

@@ -43,4 +43,12 @@ class Review extends Model
     {
         return $this->morphTo();
     }
+
+    /**
+     * Cache tags of related models to invalidate on change.
+     */
+    public function getRelatedCacheTags(): array
+    {
+        return ['products', 'stores'];
+    }
 }

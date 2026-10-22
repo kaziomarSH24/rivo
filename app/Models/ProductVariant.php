@@ -28,4 +28,12 @@ class ProductVariant extends Model
     {
         return $this->belongsTo(Product::class);
     }
+
+    /**
+     * Cache tags of related models to invalidate on change.
+     */
+    public function getRelatedCacheTags(): array
+    {
+        return ['products'];
+    }
 }

@@ -29,4 +29,12 @@ class ProductCategory extends Model
     {
         return $this->hasMany(Product::class, 'category_id');
     }
+
+    /**
+     * Cache tags of related models to invalidate on change.
+     */
+    public function getRelatedCacheTags(): array
+    {
+        return ['products'];
+    }
 }

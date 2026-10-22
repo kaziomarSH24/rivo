@@ -99,4 +99,12 @@ class Product extends Model
     {
         return $query->where('is_active', false);
     }
+
+    /**
+     * Cache tags of related models to invalidate on change.
+     */
+    public function getRelatedCacheTags(): array
+    {
+        return ['product_categories', 'stores'];
+    }
 }

@@ -22,6 +22,7 @@ class ProductCardResource extends JsonResource
             'id' => $this->id,
             'store_id' => $this->store_id,
             'category_id' => $this->category_id,
+            'brand_id' => $this->brand_id,
             'name' => $this->name,
             'slug' => $this->slug,
             'description' => $this->description,
@@ -37,6 +38,8 @@ class ProductCardResource extends JsonResource
             'rating' => (float) $this->rating,
             'reviews_count' => (int) $this->reviews_count,
             'sales_count' => (int) $this->sales_count,
+
+            // Dynamic Relations (when requested via ?include=...)
             'brand' => $this->whenLoaded('brand', function () {
                 return $this->brand ? [
                     'id' => $this->brand->id,
@@ -55,6 +58,50 @@ class ProductCardResource extends JsonResource
                     'logo' => format_media_url($this->store->logo, 'stores/logos'),
                 ] : null;
             }),
+            'category' => $this->whenLoaded('category', function () {
+                return $this->category ? [
+                    'id' => $this->category->id,
+                    'name' => $this->category->name,
+                    'slug' => $this->category->slug,
+                    'icon' => format_media_url($this->category->icon, 'categories'),
+                ] : null;
+            }),
+            'variants' => $this->whenLoaded('variants', function () {
+                return $this->variants->map(function ($variant) {
+                    return [
+                        'id' => $variant->id,
+                        'flavor' => $variant->flavor,
+                        'size_lbs' => $variant->size_lbs,
+                        'price' => (float) $variant->price,
+                        'stock' => (int) $variant->stock,
+                        'sku' => $variant->sku,
+                    ];
+                });
+            }),
+            'reviews' => $this->whenLoaded('reviews', function () {
+                return $this->reviews->map(function ($rev) {
+                    return [
+                        'id' => $rev->id,
+                        'rating' => (int) $rev->rating,
+                        'comment' => $rev->comment,
+                        'photos' => $rev->photos,
+                        'created_at' => $rev->created_at?->toISOString(),
+                    ];
+                });
+            }),
+
+            // Dynamic Counts (when requested via Spatie *Count, e.g. ?include=storeCount,variantsCount)
+            'store_count' => $this->when(!is_null($this->store_count), fn() => (int) $this->store_count),
+            'category_count' => $this->when(!is_null($this->category_count), fn() => (int) $this->category_count),
+            'brand_count' => $this->when(!is_null($this->brand_count), fn() => (int) $this->brand_count),
+            'variants_count' => $this->when(!is_null($this->variants_count), fn() => (int) $this->variants_count),
+
+            // Dynamic Exists (when requested via Spatie *Exists, e.g. ?include=variantsExists,reviewsExists)
+            'store_exists' => $this->when(!is_null($this->store_exists), fn() => (bool) $this->store_exists),
+            'category_exists' => $this->when(!is_null($this->category_exists), fn() => (bool) $this->category_exists),
+            'brand_exists' => $this->when(!is_null($this->brand_exists), fn() => (bool) $this->brand_exists),
+            'variants_exists' => $this->when(!is_null($this->variants_exists), fn() => (bool) $this->variants_exists),
+            'reviews_exists' => $this->when(!is_null($this->reviews_exists), fn() => (bool) $this->reviews_exists),
         ];
     }
 }

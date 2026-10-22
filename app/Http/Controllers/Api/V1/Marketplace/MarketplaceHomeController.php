@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api\V1\Marketplace;
 
 use App\Http\Controllers\Controller;
 use App\Http\Resources\Marketplace\CategoryResource;
+use App\Http\Resources\Marketplace\ProductCardResource;
 use App\Http\Resources\Marketplace\MarketplaceHomeResource;
 use App\Models\Product;
 use App\Models\ProductCategory;
@@ -72,7 +73,9 @@ class MarketplaceHomeController extends Controller
             $q->where('is_active', true);
         });
 
-        return response_success('Products catalog retrieved successfully.', $products);
+        $paginated = ProductCardResource::collection($products)->response()->getData(true);
+
+        return response_success('Products catalog retrieved successfully.', $paginated);
     }
 
     /**
@@ -84,7 +87,9 @@ class MarketplaceHomeController extends Controller
             $q->where('category_id', $category->id)->where('is_active', true);
         });
 
-        return response_success("Products for {$category->name} retrieved successfully.", $products);
+        $paginated = ProductCardResource::collection($products)->response()->getData(true);
+
+        return response_success("Products for {$category->name} retrieved successfully.", $paginated);
     }
 
     /**
