@@ -100,6 +100,56 @@ class MarketplaceTest extends TestCase
             ]);
     }
 
+    public function test_marketplace_home_feed_media_urls_are_properly_formatted(): void
+    {
+        $category = ProductCategory::where('slug', 'test-food')->first();
+        if ($category) {
+            $category->update(['icon' => 'food.png']);
+        }
+
+        $this->store->update([
+            'logo' => 'stores/logos/store.png',
+            'banner' => 'https://example.com/banner.jpg',
+            'is_live' => true,
+            'is_verified' => true,
+            'verification_status' => 'verified',
+        ]);
+
+        $this->product->update([
+            'images' => ['products/test.png', 'https://images.unsplash.com/sample'],
+            'is_active' => true,
+            'stock' => 20,
+            'discount_price' => 15.00,
+        ]);
+
+        $response = $this->actingAs($this->customer, 'sanctum')->getJson('/api/v1/marketplace/home');
+
+        $response->assertStatus(200);
+
+        $categories = $response->json('data.categories');
+        $this->assertNotEmpty($categories);
+        $this->assertStringStartsWith('http', $categories[0]['icon']);
+        $this->assertStringContainsString('storage/categories/food.png', $categories[0]['icon']);
+
+        $stores = $response->json('data.popular_stores');
+        $this->assertNotEmpty($stores);
+        $this->assertStringStartsWith('http', $stores[0]['logo']);
+        $this->assertStringContainsString('storage/stores/logos/store.png', $stores[0]['logo']);
+        $this->assertEquals('https://example.com/banner.jpg', $stores[0]['banner']);
+
+        $deals = $response->json('data.top_deals');
+        $this->assertNotEmpty($deals);
+        // Assert seeded Unsplash image link is preserved as full external URL
+        $this->assertStringStartsWith('http', $deals[0]['primary_image']);
+
+        // Assert local storage image path is converted to full storage URL
+        $targetProd = collect($deals)->firstWhere('id', $this->product->id);
+        $this->assertNotNull($targetProd);
+        $this->assertStringStartsWith('http', $targetProd['primary_image']);
+        $this->assertStringContainsString('storage/products/test.png', $targetProd['primary_image']);
+        $this->assertEquals('https://images.unsplash.com/sample', $targetProd['images'][1]);
+    }
+
     public function test_customer_can_search_products_and_stores(): void
     {
         $response = $this->actingAs($this->customer, 'sanctum')->getJson('/api/v1/marketplace/search?q=Dog');

@@ -14,7 +14,9 @@ class ProductCardResource extends JsonResource
             ? (int) round((($this->price - $this->discount_price) / $this->price) * 100)
             : 0;
 
-        $images = is_array($this->images) ? $this->images : [];
+        $rawImages = is_array($this->images) ? $this->images : [];
+        $images = array_values(array_filter(array_map(fn($img) => format_media_url($img, 'products'), $rawImages)));
+        $primaryImage = !empty($images) ? $images[0] : null;
 
         return [
             'id' => $this->id,
@@ -30,7 +32,7 @@ class ProductCardResource extends JsonResource
             'discount_percentage' => $discountPercentage,
             'stock' => (int) $this->stock,
             'is_in_stock' => (int) $this->stock > 0,
-            'primary_image' => !empty($images) ? $images[0] : null,
+            'primary_image' => $primaryImage,
             'images' => $images,
             'rating' => (float) $this->rating,
             'reviews_count' => (int) $this->reviews_count,
@@ -40,7 +42,7 @@ class ProductCardResource extends JsonResource
                     'id' => $this->brand->id,
                     'name' => $this->brand->name,
                     'slug' => $this->brand->slug,
-                    'logo' => $this->brand->logo,
+                    'logo' => format_media_url($this->brand->logo, 'brands/logos'),
                 ] : null;
             }),
             'store' => $this->whenLoaded('store', function () {
@@ -50,7 +52,7 @@ class ProductCardResource extends JsonResource
                     'slug' => $this->store->slug,
                     'delivery_time_text' => $this->store->delivery_time_text ?: '~15 min',
                     'delivery_fee' => (float) $this->store->delivery_fee,
-                    'logo' => $this->store->logo,
+                    'logo' => format_media_url($this->store->logo, 'stores/logos'),
                 ] : null;
             }),
         ];
