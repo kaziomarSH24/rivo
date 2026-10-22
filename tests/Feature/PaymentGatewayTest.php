@@ -2,8 +2,10 @@
 
 namespace Tests\Feature;
 
+use App\Listeners\StripeEventListener;
 use App\Models\Brand;
 use App\Models\Order;
+use App\Models\OrderItem;
 use App\Models\Product;
 use App\Models\ProductCategory;
 use App\Models\Store;
@@ -16,6 +18,7 @@ use App\Services\Payment\Gateways\CashOnDeliveryGateway;
 use App\Services\Payment\Gateways\StripePaymentGateway;
 use App\Services\Payment\PaymentGatewayManager;
 use Illuminate\Foundation\Testing\DatabaseTransactions;
+use Laravel\Cashier\Events\WebhookReceived;
 use Tests\TestCase;
 
 class PaymentGatewayTest extends TestCase
@@ -23,6 +26,7 @@ class PaymentGatewayTest extends TestCase
     use DatabaseTransactions;
 
     protected User $customer;
+    protected User $vendorUser;
     protected Store $store;
     protected Product $product;
 
@@ -38,16 +42,16 @@ class PaymentGatewayTest extends TestCase
             $this->customer->assignRole('user');
         }
 
-        $vendorUser = User::firstOrCreate(
+        $this->vendorUser = User::firstOrCreate(
             ['email' => 'payment_test_vendor@yopmail.com'],
             ['name' => 'Payment Vendor', 'password' => bcrypt('password123')]
         );
-        if (!$vendorUser->hasRole('vendor')) {
-            $vendorUser->assignRole('vendor');
+        if (!$this->vendorUser->hasRole('vendor')) {
+            $this->vendorUser->assignRole('vendor');
         }
 
         $this->store = Store::firstOrCreate(
-            ['user_id' => $vendorUser->id],
+            ['user_id' => $this->vendorUser->id],
             [
                 'name' => 'Payment Test Store',
                 'slug' => 'payment-test-store',
@@ -108,6 +112,7 @@ class PaymentGatewayTest extends TestCase
         // Add to cart
         $this->actingAs($this->customer, 'sanctum')->postJson('/api/v1/marketplace/cart/items', [
             'product_id' => $this->product->id,
+            'product_name' => $this->product->name,
             'quantity' => 1,
         ]);
 
@@ -193,5 +198,92 @@ class PaymentGatewayTest extends TestCase
 
         $response = $this->actingAs($otherUser, 'sanctum')->postJson("/api/v1/marketplace/orders/{$order->id}/confirm-payment");
         $response->assertStatus(422);
+    }
+
+    public function test_stripe_webhook_payment_intent_succeeded_marks_order_as_paid(): void
+    {
+        $order = Order::create([
+            'order_number' => 'RIV-WH123',
+            'user_id' => $this->customer->id,
+            'store_id' => $this->store->id,
+            'status' => 'new',
+            'delivery_type' => 'standard',
+            'subtotal' => 30.00,
+            'delivery_fee' => 5.00,
+            'total' => 35.00,
+            'payment_method' => 'stripe',
+            'payment_status' => 'pending',
+        ]);
+
+        $payload = [
+            'type' => 'payment_intent.succeeded',
+            'data' => [
+                'object' => [
+                    'id' => 'pi_webhook_test_9999',
+                    'amount_received' => 3500,
+                    'currency' => 'usd',
+                    'metadata' => [
+                        'order_id' => (string) $order->id,
+                        'order_number' => $order->order_number,
+                        'payable_type' => Order::class,
+                    ],
+                ],
+            ],
+        ];
+
+        $listener = new StripeEventListener();
+        $listener->handle(new WebhookReceived($payload));
+
+        $order->refresh();
+        $this->assertEquals('paid', $order->payment_status);
+        $this->assertEquals('pi_webhook_test_9999', $order->transaction_id);
+    }
+
+    public function test_vendor_reject_order_triggers_cancellation_and_inventory_restoration(): void
+    {
+        $initialStock = $this->product->fresh()->stock;
+
+        $order = Order::create([
+            'order_number' => 'RIV-REJECT1',
+            'user_id' => $this->customer->id,
+            'store_id' => $this->store->id,
+            'status' => 'new',
+            'delivery_type' => 'standard',
+            'subtotal' => 30.00,
+            'delivery_fee' => 5.00,
+            'total' => 35.00,
+            'payment_method' => 'cash_on_delivery',
+            'payment_status' => 'pending',
+        ]);
+
+        OrderItem::create([
+            'order_id' => $order->id,
+            'product_id' => $this->product->id,
+            'product_name' => $this->product->name,
+            'quantity' => 2,
+            'price' => 30.00,
+            'total' => 60.00,
+        ]);
+
+        // Decrement product stock as if checkout happened
+        $this->product->decrement('stock', 2);
+        $this->assertEquals($initialStock - 2, $this->product->fresh()->stock);
+
+        $response = $this->actingAs($this->vendorUser, 'sanctum')->postJson("/api/v1/vendor/orders/{$order->id}/reject", [
+            'reason' => 'Store is currently out of stock.',
+        ]);
+
+        $response->assertStatus(200)
+            ->assertJson([
+                'ok' => true,
+                'data' => [
+                    'status' => 'cancelled',
+                    'rejection_reason' => 'Store is currently out of stock.',
+                ]
+            ]);
+
+        // Stock restored back to initial
+        $this->assertEquals($initialStock, $this->product->fresh()->stock);
+        $this->assertEquals('cancelled', $order->fresh()->status);
     }
 }

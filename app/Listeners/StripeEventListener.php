@@ -105,7 +105,7 @@ class StripeEventListener implements ShouldQueue
                     'transaction_id' => $data['id'],
                     'placed_at' => \Carbon\Carbon::now(),
                 ]);
-                \Illuminate\Support\Facades\Log::info("Order #{\->order_number} marked as paid via Stripe payment_intent.succeeded webhook.");
+                \Illuminate\Support\Facades\Log::info("Order #{$order->order_number} marked as paid via Stripe payment_intent.succeeded webhook.");
             }
         }
 
@@ -317,3 +317,4 @@ class StripeEventListener implements ShouldQueue
         }
     }
 }
+

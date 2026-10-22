@@ -221,7 +221,7 @@ class OrderService extends BaseService
             foreach ($order->items as $item) {
                 if ($item->product_id) {
                     Product::where('id', $item->product_id)->increment('stock', $item->quantity);
-                    Product::where('id', $item->product_id)->decrement('sales_count', $item->quantity);
+                    Product::where('id', $item->product_id)->where('sales_count', '>=', $item->quantity)->decrement('sales_count', $item->quantity);
                 }
             }
 
@@ -296,7 +296,7 @@ class OrderService extends BaseService
             foreach ($order->items as $item) {
                 if ($item->product_id) {
                     Product::where('id', $item->product_id)->increment('stock', $item->quantity);
-                    Product::where('id', $item->product_id)->decrement('sales_count', $item->quantity);
+                    Product::where('id', $item->product_id)->where('sales_count', '>=', $item->quantity)->decrement('sales_count', $item->quantity);
                 }
             }
 
