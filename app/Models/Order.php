@@ -7,6 +7,8 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\MorphMany;
+use Illuminate\Database\Eloquent\Relations\MorphOne;
 
 class Order extends Model
 {
@@ -27,7 +29,9 @@ class Order extends Model
         'discount',
         'total',
         'payment_method',
+        'transaction_id',
         'payment_status',
+        'payment_metadata',
         'notes',
         'placed_at',
         'delivered_at',
@@ -37,6 +41,7 @@ class Order extends Model
 
     protected $casts = [
         'delivery_address_json' => 'array',
+        'payment_metadata' => 'array',
         'subtotal' => 'float',
         'delivery_fee' => 'float',
         'tax' => 'float',
@@ -70,6 +75,16 @@ class Order extends Model
     public function reviews(): HasMany
     {
         return $this->hasMany(Review::class);
+    }
+
+    public function transaction(): MorphOne
+    {
+        return $this->morphOne(Transaction::class, 'payable');
+    }
+
+    public function transactions(): MorphMany
+    {
+        return $this->morphMany(Transaction::class, 'payable');
     }
 
     public function scopeOngoing($query)

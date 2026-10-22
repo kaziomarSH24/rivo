@@ -87,6 +87,32 @@ class StripeEventListener implements ShouldQueue
     }
 
     /**
+     * Handles 'payment_intent.succeeded' events for marketplace orders and one-time charges.
+     */
+    protected function handlePaymentIntentSucceeded(array $payload): void
+    {
+        $data = $payload['data']['object'];
+        $metadata = $data['metadata'] ?? [];
+
+        $orderId = $metadata['order_id'] ?? ($metadata['payable_id'] ?? null);
+        $payableType = $metadata['payable_type'] ?? null;
+
+        if ($orderId && ($payableType === \App\Models\Order::class || $payableType === 'App\Models\Order' || isset($metadata['order_number']))) {
+            $order = \App\Models\Order::find($orderId);
+            if ($order && $order->payment_status !== 'paid') {
+                $order->update([
+                    'payment_status' => 'paid',
+                    'transaction_id' => $data['id'],
+                    'placed_at' => \Carbon\Carbon::now(),
+                ]);
+                \Illuminate\Support\Facades\Log::info("Order #{\->order_number} marked as paid via Stripe payment_intent.succeeded webhook.");
+            }
+        }
+
+        $this->_processSuccessfulPayment($payload);
+    }
+
+    /**
      * Private helper method to process successful payments.
      */
     private function _processSuccessfulPayment(array $payload): void

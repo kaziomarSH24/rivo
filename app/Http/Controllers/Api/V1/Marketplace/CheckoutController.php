@@ -4,9 +4,11 @@ namespace App\Http\Controllers\Api\V1\Marketplace;
 
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Marketplace\CheckoutRequest;
+use App\Models\Order;
 use App\Services\Marketplace\CartService;
 use App\Services\Marketplace\OrderService;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Request;
 
 class CheckoutController extends Controller
 {
@@ -20,18 +22,40 @@ class CheckoutController extends Controller
     }
 
     /**
-     * Complete checkout: places order, decrements stock, clears cart & issues order receipt
+     * Complete checkout: places order, decrements stock, clears cart & issues payment intent
      */
     public function process(CheckoutRequest $request): JsonResponse
     {
         try {
-            $order = $this->orderService->checkout(
+            $result = $this->orderService->checkout(
                 $request->user(),
                 $request->validated(),
                 $this->cartService
             );
 
-            return response_success('Order placed successfully.', $order, 201);
+            return response_success('Order placed successfully.', $result, 201);
+        } catch (\Exception $e) {
+            return response_error($e->getMessage(), [], 422);
+        }
+    }
+
+    /**
+     * Confirm client-side payment (e.g., after Stripe PaymentSheet or Apple Pay completes)
+     */
+    public function confirmPayment(Request $request, Order $order): JsonResponse
+    {
+        try {
+            $result = $this->orderService->confirmOrderPayment(
+                $request->user(),
+                $order,
+                $request->all()
+            );
+
+            if ($result['success']) {
+                return response_success($result['message'], $result['order']);
+            }
+
+            return response_error($result['message'], ['order' => $result['order']], 422);
         } catch (\Exception $e) {
             return response_error($e->getMessage(), [], 422);
         }

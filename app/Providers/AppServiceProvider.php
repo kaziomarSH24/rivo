@@ -14,7 +14,13 @@ class AppServiceProvider extends ServiceProvider
      */
     public function register(): void
     {
-        //
+        $this->app->singleton(\App\Services\Payment\PaymentGatewayManager::class, function ($app) {
+            return new \App\Services\Payment\PaymentGatewayManager();
+        });
+
+        $this->app->bind(\App\Services\Payment\Contracts\PaymentGatewayInterface::class, function ($app) {
+            return $app->make(\App\Services\Payment\PaymentGatewayManager::class)->gateway();
+        });
     }
 
     /**

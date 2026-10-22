@@ -298,7 +298,8 @@ Route::middleware(['auth:sanctum', 'throttle:api'])->prefix('v1')->name('api.v1.
         Route::delete('cart', [\App\Http\Controllers\Api\V1\Marketplace\CartController::class, 'clear']);
 
         // Checkout & Orders
-        Route::post('checkout', [\App\Http\Controllers\Api\V1\Marketplace\CheckoutController::class, 'process']);
+                Route::post('checkout', [\App\Http\Controllers\Api\V1\Marketplace\CheckoutController::class, 'process']);
+        Route::post('orders/{order}/confirm-payment', [\App\Http\Controllers\Api\V1\Marketplace\CheckoutController::class, 'confirmPayment']);
         Route::get('orders', [\App\Http\Controllers\Api\V1\Marketplace\CustomerOrderController::class, 'index']);
         Route::get('orders/{order}', [\App\Http\Controllers\Api\V1\Marketplace\CustomerOrderController::class, 'show']);
         Route::post('orders/{order}/cancel', [\App\Http\Controllers\Api\V1\Marketplace\CustomerOrderController::class, 'cancel']);

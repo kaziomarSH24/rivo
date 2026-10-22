@@ -10,6 +10,7 @@ use App\Models\Store;
 use App\Models\User;
 use App\Models\UserAddress;
 use App\Services\BaseService;
+use App\Services\Payment\PaymentGatewayManager;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
@@ -35,7 +36,7 @@ class OrderService extends BaseService
 
     protected function getAllowedIncludes(): array
     {
-        return ['user', 'store', 'address', 'items', 'reviews'];
+        return ['user', 'store', 'address', 'items', 'reviews', 'transaction', 'transactions'];
     }
 
     protected function getAllowedSorts(): array
@@ -44,10 +45,14 @@ class OrderService extends BaseService
     }
 
     /**
-     * Customer Checkout: Place an order from active cart
+     * Customer Checkout: Place an order from active cart & process payment via Gateway Interface
      */
-    public function checkout(User $user, array $data, CartService $cartService): Order
-    {
+    public function checkout(
+        User $user,
+        array $data,
+        CartService $cartService,
+        ?PaymentGatewayManager $paymentManager = null
+    ): array {
         $cartData = $cartService->getCart($user);
         $cart = Cart::where('user_id', $user->id)->firstOrFail();
 
@@ -55,7 +60,10 @@ class OrderService extends BaseService
             throw new \Exception('Cart is empty. Please add items before checkout.');
         }
 
-        return DB::transaction(function () use ($user, $data, $cartData, $cart, $cartService) {
+        $paymentManager = $paymentManager ?: app(PaymentGatewayManager::class);
+        $paymentMethod = $data['payment_method'] ?? 'stripe';
+
+        return DB::transaction(function () use ($user, $data, $cartData, $cart, $cartService, $paymentManager, $paymentMethod) {
             $store = $cart->store;
             $address = isset($data['address_id']) ? UserAddress::find($data['address_id']) : null;
             $addressJson = $address ? [
@@ -83,8 +91,8 @@ class OrderService extends BaseService
                 'tax' => $cartData['summary']['tax'],
                 'discount' => $cartData['summary']['discount'],
                 'total' => $cartData['summary']['total'],
-                'payment_method' => $data['payment_method'] ?? 'mastercard',
-                'payment_status' => 'paid',
+                'payment_method' => $paymentMethod,
+                'payment_status' => 'pending',
                 'notes' => $data['notes'] ?? null,
                 'placed_at' => Carbon::now(),
             ]);
@@ -116,8 +124,63 @@ class OrderService extends BaseService
             // Clear the cart
             $cartService->clearCart($user);
 
-            return $order->load(['items', 'store', 'user']);
+            // Process payment through the decoupled payment gateway interface
+            $gateway = $paymentManager->gateway($paymentMethod);
+            $paymentResult = $gateway->processPayment($order, [
+                'payment_method_id' => $data['payment_method_id'] ?? null,
+            ]);
+
+            return [
+                'order' => $order->fresh(['items', 'store', 'user', 'address', 'transaction']),
+                'payment' => $paymentResult->toArray(),
+            ];
         });
+    }
+
+    /**
+     * Customer: Confirm payment for an order via Payment Gateway Interface
+     */
+    public function confirmOrderPayment(
+        User $user,
+        Order $order,
+        array $payload = [],
+        ?PaymentGatewayManager $paymentManager = null
+    ): array {
+        if ($order->user_id !== $user->id) {
+            throw new \Exception('Unauthorized access to this order.');
+        }
+
+        if ($order->payment_status === 'paid') {
+            return [
+                'success' => true,
+                'message' => 'Order is already marked as paid.',
+                'order' => $order->load(['items', 'store', 'transaction']),
+            ];
+        }
+
+        $paymentManager = $paymentManager ?: app(PaymentGatewayManager::class);
+        $gateway = $paymentManager->gateway($order->payment_method);
+
+        $isVerified = $gateway->verifyPayment($order, $payload);
+
+        if ($isVerified) {
+            $order->update([
+                'payment_status' => 'paid',
+                'placed_at' => Carbon::now(),
+            ]);
+
+            return [
+                'success' => true,
+                'message' => 'Payment verified and order confirmed successfully.',
+                'order' => $order->fresh(['items', 'store', 'user', 'address', 'transaction']),
+            ];
+        }
+
+        return [
+            'success' => false,
+            'message' => 'Payment verification failed or status is not succeeded yet.',
+            'order' => $order->fresh(['items', 'store', 'transaction']),
+        ];
     }
 
     /**
@@ -136,15 +199,19 @@ class OrderService extends BaseService
     }
 
     /**
-     * Vendor: Reject an order (cancels and restores stock)
+     * Vendor: Reject an order (cancels, restores stock, and initiates refund if paid)
      */
-    public function vendorRejectOrder(Store $store, Order $order, ?string $reason = null): Order
-    {
+    public function vendorRejectOrder(
+        Store $store,
+        Order $order,
+        ?string $reason = null,
+        ?PaymentGatewayManager $paymentManager = null
+    ): Order {
         if ($order->store_id !== $store->id) {
             throw new \Exception('Unauthorized access to this order.');
         }
 
-        return DB::transaction(function () use ($order, $reason) {
+        return DB::transaction(function () use ($order, $reason, $paymentManager) {
             $order->status = 'cancelled';
             $order->cancelled_at = Carbon::now();
             $order->rejection_reason = $reason ?: 'Rejected by store';
@@ -158,7 +225,18 @@ class OrderService extends BaseService
                 }
             }
 
-            return $order;
+            // If order was already paid, initiate refund via gateway
+            if ($order->payment_status === 'paid') {
+                try {
+                    $manager = $paymentManager ?: app(PaymentGatewayManager::class);
+                    $gateway = $manager->gateway($order->payment_method);
+                    $gateway->refund($order, $order->total, $reason);
+                } catch (\Exception $e) {
+                    \Log::error('Auto-refund on rejection failed: ' . $e->getMessage(), ['order_id' => $order->id]);
+                }
+            }
+
+            return $order->load(['items', 'user', 'transaction']);
         });
     }
 
@@ -179,6 +257,10 @@ class OrderService extends BaseService
         $order->status = $newStatus;
         if ($newStatus === 'delivered') {
             $order->delivered_at = Carbon::now();
+            // If COD, mark paid upon successful delivery
+            if ($order->payment_method === 'cash_on_delivery' && $order->payment_status !== 'paid') {
+                $order->payment_status = 'paid';
+            }
         } elseif ($newStatus === 'cancelled') {
             $order->cancelled_at = Carbon::now();
         }
@@ -190,8 +272,12 @@ class OrderService extends BaseService
     /**
      * Customer: Cancel an order before shipment
      */
-    public function customerCancelOrder(User $user, Order $order, ?string $reason = null): Order
-    {
+    public function customerCancelOrder(
+        User $user,
+        Order $order,
+        ?string $reason = null,
+        ?PaymentGatewayManager $paymentManager = null
+    ): Order {
         if ($order->user_id !== $user->id) {
             throw new \Exception('Unauthorized access to this order.');
         }
@@ -200,7 +286,7 @@ class OrderService extends BaseService
             throw new \Exception("Order cannot be cancelled as it is already '{$order->status}'.");
         }
 
-        return DB::transaction(function () use ($order, $reason) {
+        return DB::transaction(function () use ($order, $reason, $paymentManager) {
             $order->status = 'cancelled';
             $order->cancelled_at = Carbon::now();
             $order->rejection_reason = $reason ?: 'Cancelled by customer';
@@ -214,7 +300,18 @@ class OrderService extends BaseService
                 }
             }
 
-            return $order->load(['items', 'store']);
+            // Refund if paid
+            if ($order->payment_status === 'paid') {
+                try {
+                    $manager = $paymentManager ?: app(PaymentGatewayManager::class);
+                    $gateway = $manager->gateway($order->payment_method);
+                    $gateway->refund($order, $order->total, $reason);
+                } catch (\Exception $e) {
+                    \Log::error('Auto-refund on customer cancel failed: ' . $e->getMessage(), ['order_id' => $order->id]);
+                }
+            }
+
+            return $order->load(['items', 'store', 'transaction']);
         });
     }
 
@@ -224,7 +321,7 @@ class OrderService extends BaseService
     public function getCustomerOrders(User $user, ?string $statusFilter = null)
     {
         $query = Order::where('user_id', $user->id)
-            ->with(['store:id,name,logo', 'items'])
+            ->with(['store:id,name,logo', 'items', 'transaction'])
             ->latest();
 
         if ($statusFilter === 'ongoing') {

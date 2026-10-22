@@ -173,7 +173,7 @@ class MarketplaceTest extends TestCase
         $checkoutResponse->assertStatus(201)
             ->assertJson(['ok' => true]);
 
-        $orderData = $checkoutResponse->json('data');
+        $orderData = $checkoutResponse->json('data.order') ?? $checkoutResponse->json('data');
         $this->assertEquals('new', $orderData['status']);
         $this->assertStringStartsWith('RIV-', $orderData['order_number']);
 
