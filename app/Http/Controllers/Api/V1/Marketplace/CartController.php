@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\Marketplace\AddToCartRequest;
 use App\Http\Requests\Marketplace\UpdateCartItemRequest;
 use App\Models\CartItem;
+use App\Http\Resources\Marketplace\CartResource;
 use App\Services\Marketplace\CartService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -26,7 +27,7 @@ class CartController extends Controller
     {
         $cart = $this->cartService->getCart($request->user());
 
-        return response_success('Cart retrieved successfully.', $cart);
+        return response_success('Cart retrieved successfully.', new CartResource($cart));
     }
 
     /**
@@ -42,7 +43,7 @@ class CartController extends Controller
                 (int) ($request->input('quantity') ?: 1)
             );
 
-            return response_success('Item added to cart.', $cart, 201);
+            return response_success('Item added to cart.', new CartResource($cart), 201);
         } catch (\Exception $e) {
             return response_error($e->getMessage(), [], 422);
         }
@@ -60,7 +61,7 @@ class CartController extends Controller
                 (int) $request->input('quantity')
             );
 
-            return response_success('Cart item updated.', $cart);
+            return response_success('Cart item updated.', new CartResource($cart));
         } catch (\Exception $e) {
             return response_error($e->getMessage(), [], 422);
         }
@@ -74,7 +75,7 @@ class CartController extends Controller
         try {
             $cart = $this->cartService->removeItem($request->user(), $item->id);
 
-            return response_success('Item removed from cart.', $cart);
+            return response_success('Item removed from cart.', new CartResource($cart));
         } catch (\Exception $e) {
             return response_error($e->getMessage(), [], 422);
         }

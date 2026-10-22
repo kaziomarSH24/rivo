@@ -11,6 +11,8 @@ use App\Services\BaseService;
 
 class CartService extends BaseService
 {
+    protected bool $cachingEnabled = false;
+
     protected string $modelClass = Cart::class;
 
     protected function getAllowedFilters(): array
@@ -36,7 +38,7 @@ class CartService extends BaseService
         $cart = Cart::firstOrCreate(['user_id' => $user->id]);
 
         $cart->load([
-            'store:id,name,logo,delivery_fee,delivery_time_text',
+            'store:id,name,slug,logo,delivery_fee,delivery_time_text',
             'items.product:id,store_id,name,price,discount_price,images,stock',
             'items.variant:id,flavor,size_lbs,price,stock',
         ]);
