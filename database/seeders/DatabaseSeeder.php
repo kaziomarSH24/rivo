@@ -29,6 +29,7 @@ class DatabaseSeeder extends Seeder
             HealthVaultSeeder::class,
             SmartAlertSeeder::class,
             SocialFeedSeeder::class,
+            MarketplaceSeeder::class,
         ]);
     }
 }
