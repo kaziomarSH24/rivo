@@ -8,6 +8,7 @@ use App\Http\Resources\Marketplace\ProductCardResource;
 use App\Http\Resources\Marketplace\StoreCardResource;
 use App\Http\Resources\Marketplace\StoreProfileResource;
 use App\Http\Resources\Marketplace\ProductDetailsResource;
+use App\Http\Resources\Marketplace\SearchResultResource;
 use App\Http\Resources\Marketplace\MarketplaceHomeResource;
 use App\Models\Product;
 use App\Models\ProductCategory;
@@ -111,69 +112,13 @@ class MarketplaceHomeController extends Controller
 
     /**
      * Unified Search with 2 tabs: Products & Stores + Recent Searches
+     * Formatted with SearchResultResource
      */
     public function search(Request $request): JsonResponse
     {
-        $query = $request->query('q');
-        $user = $request->user();
+        $result = $this->homeService->search($request->query('q'), $request->user());
 
-        // Record recent search if query is provided and user is authenticated
-        if ($query && $user) {
-            RecentSearch::updateOrCreate(
-                ['user_id' => $user->id, 'query' => trim($query)],
-                ['updated_at' => now()]
-            );
-        }
-
-        // Recent searches for user
-        $recentSearches = $user
-            ? RecentSearch::where('user_id', $user->id)->latest('updated_at')->limit(5)->pluck('query')
-            : [];
-
-        // Popular search tags dynamically from recent searches or active categories
-        $popularTags = RecentSearch::select('query', DB::raw('count(*) as search_count'))
-            ->groupBy('query')
-            ->orderByDesc('search_count')
-            ->limit(8)
-            ->pluck('query')
-            ->toArray();
-
-        if (empty($popularTags)) {
-            $popularTags = ProductCategory::where('is_active', true)
-                ->orderBy('order_column')
-                ->limit(6)
-                ->pluck('name')
-                ->toArray();
-        }
-
-        // Search products via BaseService
-        $products = [];
-        $stores = [];
-
-        if ($query) {
-            $products = $this->productService->getAll(function ($q) use ($query) {
-                $q->where('is_active', true)
-                    ->where(function ($sub) use ($query) {
-                        $sub->where('name', 'like', "%{$query}%")
-                            ->orWhere('description', 'like', "%{$query}%");
-                    });
-            });
-
-            $stores = $this->storeService->getAll(function ($q) use ($query) {
-                $q->where('is_live', true)
-                    ->where(function ($sub) use ($query) {
-                        $sub->where('name', 'like', "%{$query}%")
-                            ->orWhere('city', 'like', "%{$query}%");
-                    });
-            });
-        }
-
-        return response_success('Search results retrieved.', [
-            'recent_searches' => $recentSearches,
-            'popular_tags' => $popularTags,
-            'products' => $products,
-            'stores' => $stores,
-        ]);
+        return response_success('Search results retrieved.', new SearchResultResource($result));
     }
 
     /**
@@ -181,9 +126,7 @@ class MarketplaceHomeController extends Controller
      */
     public function clearRecentSearches(Request $request): JsonResponse
     {
-        if ($request->user()) {
-            RecentSearch::where('user_id', $request->user()->id)->delete();
-        }
+        $this->homeService->clearRecentSearches($request->user());
 
         return response_success('Recent searches cleared successfully.', []);
     }
