@@ -110,7 +110,7 @@ trait Cacheable
         if ($method === 'getAll' || $method === 'paginate') {
             $queryParams = request()->query();
             ksort($queryParams);
-            $queryString = serialize($queryParams);
+            $queryString = request()->path() . ":" . serialize($queryParams);
         }
 
         // SHA-256 hash creates a fast, unique, and perfectly safe key for complex parameters
