@@ -45,6 +45,58 @@ class ProductService extends BaseService
     }
 
     /**
+     * Get vendor products catalog with live tab counters, status filters, search and caching
+     */
+    public function getVendorCatalog(Store $store, Request $request): array
+    {
+        $status = $request->input('status', $request->input('filter.status', 'all'));
+        $search = $request->input('search', $request->input('filter.search', ''));
+        $page = (int) $request->input('page', 1);
+        $perPage = (int) $request->input('per_page', 15);
+        $sort = $request->input('sort', '-created_at');
+
+        $cacheTags = ["stores:{$store->id}:products", "stores:{$store->id}", 'stores'];
+        $cacheKey = "vendor:catalog:{$store->id}:s_{$status}:q_" . md5($search) . ":p_{$page}:pp_{$perPage}:sort_{$sort}";
+
+        return $this->rememberCache($cacheKey, function () use ($store, $status, $search, $perPage) {
+            // 1. Compute live tab counters matching Figma UI pills (All, Active, Draft, Out of Stock)
+            $baseQuery = Product::where('store_id', $store->id);
+            $counters = [
+                'all' => (clone $baseQuery)->count(),
+                'active' => (clone $baseQuery)->where('is_active', true)->where('stock', '>', 0)->count(),
+                'draft' => (clone $baseQuery)->where('is_active', false)->count(),
+                'out_of_stock' => (clone $baseQuery)->where('stock', '<=', 0)->count(),
+            ];
+
+            // 2. Fetch filtered products with eager loaded relations
+            $query = Product::where('store_id', $store->id)
+                ->with(['category:id,name', 'brand:id,name']);
+
+            if ($status === 'active') {
+                $query->where('is_active', true)->where('stock', '>', 0);
+            } elseif ($status === 'draft' || $status === 'inactive') {
+                $query->where('is_active', false);
+            } elseif ($status === 'out_of_stock') {
+                $query->where('stock', '<=', 0);
+            }
+
+            if (!empty($search)) {
+                $query->where(function ($q) use ($search) {
+                    $q->where('name', 'like', "%{$search}%")
+                      ->orWhere('sku', 'like', "%{$search}%");
+                });
+            }
+
+            $paginator = $query->latest('id')->paginate($perPage);
+
+            return [
+                'counters' => $counters,
+                'paginator' => $paginator,
+            ];
+        }, ttl: 300, tags: $cacheTags, lock: true);
+    }
+
+    /**
      * Create product with 4-step wizard data
      */
     public function storeProduct(Store $store, array $data, Request $request): Product
