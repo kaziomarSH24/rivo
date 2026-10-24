@@ -15,8 +15,7 @@ class StoreReviewRequest extends BaseRequest
             'rating' => 'required|integer|min:1|max:5',
             'comment' => 'nullable|string|max:1000',
             'is_anonymous' => 'nullable|boolean',
-            'photo' => 'nullable|image|max:5120',
-            'photos' => 'nullable|array',
+            'photos' => 'nullable',
             'photos.*' => 'image|max:5120',
         ];
     }

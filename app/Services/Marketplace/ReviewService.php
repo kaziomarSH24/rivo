@@ -12,6 +12,7 @@ use App\Services\BaseService;
 use App\Traits\FileUploadTrait;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Cache;
 
 class ReviewService extends BaseService
 {
@@ -107,22 +108,21 @@ class ReviewService extends BaseService
             }
         }
 
-        $uploadedPhotos = [];
-        if ($request->hasFile('photos')) {
-            $photos = $request->file('photos');
-            if (is_array($photos)) {
-                foreach ($photos as $photo) {
-                    if ($photo && $photo->isValid()) {
-                        $uploadedPhotos[] = $photo->store('reviews', 'public');
-                    }
-                }
-            } elseif ($photos && $photos->isValid()) {
-                $uploadedPhotos[] = $photos->store('reviews', 'public');
-            }
-        } elseif ($request->hasFile('photo')) {
-            $photo = $request->file('photo');
-            if ($photo && $photo->isValid()) {
-                $uploadedPhotos[] = $photo->store('reviews', 'public');
+        // Upload and optimize images via FileUploadTrait (scaled to max 1200px, converted to WebP format)
+        $uploadedPhotos = $this->handleMultipleFileUpload(
+            $request,
+            'photos',
+            'reviews',
+            width: 1200,
+            quality: 85,
+            forceWebp: true
+        );
+
+        // Fallback for legacy single field 'photo' if sent
+        if (empty($uploadedPhotos) && $request->hasFile('photo')) {
+            $legacyPath = $this->handleFileUpload($request, 'photo', 'reviews', width: 1200, quality: 85, forceWebp: true);
+            if ($legacyPath) {
+                $uploadedPhotos = [$legacyPath];
             }
         }
 
@@ -145,47 +145,58 @@ class ReviewService extends BaseService
         $model->reviews_count = $reviewsCount;
         $model->save();
 
+        // Invalidate reviews cache tags for this specific entity so customers immediately see the new review
+        $modelTable = $model->getTable();
+        Cache::tags(['reviews', "{$modelTable}:{$model->id}", $modelTable])->flush();
+
         return $review->load(['user:id,name,avatar']);
     }
 
     /**
-     * Get reviews and 5-star breakdown statistics for a Product or Store
+     * Get reviews and 5-star breakdown statistics for a Product or Store with Redis caching
      */
-    public function getReviewsSummary(Model $model): array
+    public function getReviewsSummary(Model $model, int $page = 1, int $perPage = 15): array
     {
-        $reviewsQuery = $model->reviews();
+        $modelTable = $model->getTable();
+        $modelId = $model->id;
+        $cacheTags = ['reviews', "{$modelTable}:{$modelId}", $modelTable];
+        $cacheKey = "reviews_summary:{$modelTable}:{$modelId}:page_{$page}:per_page_{$perPage}";
 
-        $totalCount = (clone $reviewsQuery)->count();
-        $avgRating = $totalCount > 0 ? round((clone $reviewsQuery)->avg('rating'), 1) : 5.0;
+        return Cache::tags($cacheTags)->remember($cacheKey, 3600, function () use ($model, $page, $perPage) {
+            $reviewsQuery = $model->reviews();
 
-        // Star breakdown (1 to 5 stars)
-        $breakdown = [];
-        for ($star = 5; $star >= 1; $star--) {
-            $starCount = (clone $reviewsQuery)->where('rating', $star)->count();
-            $percentage = $totalCount > 0 ? round(($starCount / $totalCount) * 100) : 0;
-            $breakdown[(string) $star] = [
-                'star' => $star,
-                'count' => $starCount,
-                'percentage' => $percentage,
+            $totalCount = (clone $reviewsQuery)->count();
+            $avgRating = $totalCount > 0 ? round((clone $reviewsQuery)->avg('rating'), 1) : 5.0;
+
+            // Star breakdown (1 to 5 stars)
+            $breakdown = [];
+            for ($star = 5; $star >= 1; $star--) {
+                $starCount = (clone $reviewsQuery)->where('rating', $star)->count();
+                $percentage = $totalCount > 0 ? round(($starCount / $totalCount) * 100) : 0;
+                $breakdown[(string) $star] = [
+                    'star' => $star,
+                    'count' => $starCount,
+                    'percentage' => $percentage,
+                ];
+            }
+
+            $reviewsList = (clone $reviewsQuery)
+                ->with(['user:id,name,avatar'])
+                ->latest()
+                ->paginate($perPage, ['*'], 'page', $page);
+
+            return [
+                'rating' => $avgRating,
+                'reviews_count' => $totalCount,
+                'breakdown' => (object) $breakdown,
+                'reviews' => [
+                    'current_page' => $reviewsList->currentPage(),
+                    'data' => ReviewResource::collection($reviewsList->getCollection())->resolve(),
+                    'per_page' => $reviewsList->perPage(),
+                    'total' => $reviewsList->total(),
+                    'last_page' => $reviewsList->lastPage(),
+                ],
             ];
-        }
-
-        $reviewsList = (clone $reviewsQuery)
-            ->with(['user:id,name,avatar'])
-            ->latest()
-            ->paginate(15);
-
-        return [
-            'rating' => $avgRating,
-            'reviews_count' => $totalCount,
-            'breakdown' => (object) $breakdown,
-            'reviews' => [
-                'current_page' => $reviewsList->currentPage(),
-                'data' => ReviewResource::collection($reviewsList->getCollection())->resolve(),
-                'per_page' => $reviewsList->perPage(),
-                'total' => $reviewsList->total(),
-                'last_page' => $reviewsList->lastPage(),
-            ],
-        ];
+        });
     }
 }

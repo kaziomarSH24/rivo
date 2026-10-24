@@ -41,21 +41,25 @@ class ReviewController extends Controller
     }
 
     /**
-     * Get product reviews and 5-star distribution breakdown
+     * Get product reviews and 5-star distribution breakdown (cached via Redis tags)
      */
     public function productReviews(Request $request, Product $product): JsonResponse
     {
-        $summary = $this->reviewService->getReviewsSummary($product);
+        $page = (int) $request->input('page', 1);
+        $perPage = (int) $request->input('per_page', 15);
+        $summary = $this->reviewService->getReviewsSummary($product, $page, $perPage);
 
         return response_success('Product reviews retrieved successfully.', $summary);
     }
 
     /**
-     * Get store reviews and 5-star distribution breakdown
+     * Get store reviews and 5-star distribution breakdown (cached via Redis tags)
      */
     public function storeReviews(Request $request, Store $store): JsonResponse
     {
-        $summary = $this->reviewService->getReviewsSummary($store);
+        $page = (int) $request->input('page', 1);
+        $perPage = (int) $request->input('per_page', 15);
+        $summary = $this->reviewService->getReviewsSummary($store, $page, $perPage);
 
         return response_success('Store reviews retrieved successfully.', $summary);
     }
