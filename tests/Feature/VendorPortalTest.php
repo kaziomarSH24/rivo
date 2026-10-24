@@ -10,6 +10,8 @@ use App\Models\Store;
 use App\Models\User;
 use Illuminate\Foundation\Testing\DatabaseTransactions;
 use Tests\TestCase;
+use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\Storage;
 
 class VendorPortalTest extends TestCase
 {
@@ -203,5 +205,138 @@ class VendorPortalTest extends TestCase
                     'best_sellers',
                 ]
             ]);
+    }
+    public function test_vendor_can_onboard_store_and_safely_re_submit_via_store_endpoint(): void
+    {
+        Storage::fake('public');
+
+        $newVendor = User::factory()->create([
+            'email' => 'new_vendor_' . uniqid() . '@yopmail.com',
+            'password' => bcrypt('password123'),
+        ]);
+
+        $logoFile = UploadedFile::fake()->image('store_logo.jpg', 500, 500);
+        $bannerFile = UploadedFile::fake()->image('store_banner.jpg', 1500, 700);
+
+        // 1. Initial Onboarding via POST /api/v1/vendor/store
+        $response = $this->actingAs($newVendor, 'sanctum')->post('/api/v1/vendor/store', [
+            'name' => 'Happy Paws Austin',
+            'type' => 'pet_shop',
+            'owner_name' => 'Alex Happy',
+            'phone' => '+15129990000',
+            'email' => 'alex@happypaws.com',
+            'street_address' => '1200 S Lamar Blvd',
+            'city' => 'Austin',
+            'state' => 'TX',
+            'zip_code' => '78704',
+            'delivery_fee' => 4.99,
+            'delivery_time_text' => '20-30 min',
+            'logo' => $logoFile,
+            'banner' => $bannerFile,
+        ], ['Accept' => 'application/json']);
+
+        $response->assertStatus(201)
+            ->assertJson([
+                'ok' => true,
+                'message' => 'Store profile created successfully.',
+            ])
+            ->assertJsonStructure([
+                'data' => [
+                    'id',
+                    'name',
+                    'slug',
+                    'type',
+                    'owner_name',
+                    'phone',
+                    'email',
+                    'street_address',
+                    'city',
+                    'state',
+                    'zip_code',
+                    'logo',
+                    'banner',
+                    'rating',
+                    'reviews_count',
+                    'fulfillment_rate',
+                    'delivery_fee',
+                    'delivery_time_text',
+                    'is_verified',
+                    'verification_status',
+                    'is_live',
+                    'documents',
+                ]
+            ]);
+
+        $storeSlug = $response->json('data.slug');
+        $logoUrl = $response->json('data.logo');
+        $bannerUrl = $response->json('data.banner');
+
+        $this->assertStringContainsString('stores/logos', $logoUrl);
+        $this->assertStringEndsWith('.webp', $logoUrl);
+        $this->assertStringContainsString('stores/banners', $bannerUrl);
+        $this->assertStringEndsWith('.webp', $bannerUrl);
+
+        // 2. Safe re-submit via POST /api/v1/vendor/store (without uploading new files)
+        $reSubmitResponse = $this->actingAs($newVendor, 'sanctum')->post('/api/v1/vendor/store', [
+            'name' => 'Happy Paws Austin Updated',
+            'type' => 'pet_shop',
+            'street_address' => '1200 S Lamar Blvd, Suite B',
+            'delivery_fee' => 5.99,
+        ], ['Accept' => 'application/json']);
+
+        $reSubmitResponse->assertStatus(200)
+            ->assertJson([
+                'ok' => true,
+                'message' => 'Store profile updated successfully.',
+            ]);
+
+        // Verify slug, rating, and images are preserved
+        $this->assertEquals($storeSlug, $reSubmitResponse->json('data.slug'));
+        $this->assertEquals($logoUrl, $reSubmitResponse->json('data.logo'));
+        $this->assertEquals($bannerUrl, $reSubmitResponse->json('data.banner'));
+        $this->assertEquals(5.99, (float) $reSubmitResponse->json('data.delivery_fee'));
+    }
+
+    public function test_vendor_can_upload_and_delete_kyc_document(): void
+    {
+        Storage::fake('public');
+
+        $pdfFile = UploadedFile::fake()->create('business_license.pdf', 500, 'application/pdf');
+
+        // 1. Upload KYC Document
+        $uploadResponse = $this->actingAs($this->vendorUser, 'sanctum')->post('/api/v1/vendor/documents', [
+            'type' => 'business_license',
+            'document' => $pdfFile,
+        ], ['Accept' => 'application/json']);
+
+        $uploadResponse->assertStatus(201)
+            ->assertJson([
+                'ok' => true,
+                'message' => 'KYC Document uploaded successfully.',
+            ])
+            ->assertJsonStructure([
+                'data' => [
+                    'id',
+                    'store_id',
+                    'type',
+                    'file_url',
+                    'original_name',
+                    'status',
+                ]
+            ]);
+
+        $docId = $uploadResponse->json('data.id');
+        $fileUrl = $uploadResponse->json('data.file_url');
+        $this->assertNotNull($fileUrl);
+
+        // 2. Delete KYC Document
+        $deleteResponse = $this->actingAs($this->vendorUser, 'sanctum')->deleteJson("/api/v1/vendor/documents/{$docId}");
+        $deleteResponse->assertStatus(200)
+            ->assertJson([
+                'ok' => true,
+                'message' => 'Document removed successfully.',
+            ]);
+
+        $this->assertDatabaseMissing('store_documents', ['id' => $docId]);
     }
 }

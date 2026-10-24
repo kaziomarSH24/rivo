@@ -18,6 +18,7 @@ use Spatie\QueryBuilder\AllowedInclude;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
+use Illuminate\Support\Facades\Cache;
 
 class StoreService extends BaseService
 {
@@ -65,8 +66,8 @@ class StoreService extends BaseService
         return ['created_at', 'rating', 'reviews_count', 'name', 'delivery_fee'];
     }
 
-    /**
-     * Register a new store / merchant
+        /**
+     * Register a new store / merchant (or safely update if already exists)
      */
     public function registerStore(User $user, array $data, Request $request): Store
     {
@@ -75,45 +76,114 @@ class StoreService extends BaseService
             $user->assignRole('vendor');
         }
 
-        // 2. Handle logo and banner uploads
-        $logoPath = $this->handleFileUpload($request, 'logo', 'stores/logos', 400, 400, 90, true);
-        $bannerPath = $this->handleFileUpload($request, 'banner', 'stores/banners', 1200, 600, 90, true);
+        $existingStore = Store::where('user_id', $user->id)->first();
 
-        // 3. Create or update the Store record
-        $slug = Str::slug($data['name']);
-        $uniqueSlug = $slug . '-' . Str::lower(Str::random(5));
+        // 2. Handle logo and banner uploads (with WebP conversion and old image cleanup)
+        $logoPath = null;
+        if ($request->hasFile('logo')) {
+            if ($existingStore && $existingStore->logo) {
+                $this->deleteFile($existingStore->logo);
+            }
+            $logoPath = $this->handleFileUpload($request, 'logo', 'stores/logos', 400, 400, 90, true);
+        } elseif ($existingStore) {
+            $logoPath = $existingStore->logo;
+        }
+
+        $bannerPath = null;
+        if ($request->hasFile('banner')) {
+            if ($existingStore && $existingStore->banner) {
+                $this->deleteFile($existingStore->banner);
+            }
+            $bannerPath = $this->handleFileUpload($request, 'banner', 'stores/banners', 1200, 600, 90, true);
+        } elseif ($existingStore) {
+            $bannerPath = $existingStore->banner;
+        }
+
+        // 3. Determine slug: preserve existing slug if updating
+        if ($existingStore && !empty($existingStore->slug)) {
+            $slug = $existingStore->slug;
+        } else {
+            $baseSlug = Str::slug($data['name']);
+            $slug = $baseSlug . '-' . Str::lower(Str::random(5));
+        }
 
         $store = Store::updateOrCreate(
             ['user_id' => $user->id],
             [
                 'name' => $data['name'],
-                'slug' => $uniqueSlug,
-                'type' => $data['type'] ?? 'pet_shop',
-                'owner_name' => $data['owner_name'] ?? $user->name,
-                'phone' => $data['phone'] ?? $user->phone_number,
-                'email' => $data['email'] ?? $user->email,
-                'street_address' => $data['street_address'] ?? null,
-                'city' => $data['city'] ?? null,
-                'state' => $data['state'] ?? null,
-                'zip_code' => $data['zip_code'] ?? null,
-                'latitude' => $data['latitude'] ?? null,
-                'longitude' => $data['longitude'] ?? null,
+                'slug' => $slug,
+                'type' => $data['type'] ?? ($existingStore?->type ?? 'pet_shop'),
+                'owner_name' => $data['owner_name'] ?? ($existingStore?->owner_name ?? $user->name),
+                'phone' => $data['phone'] ?? ($existingStore?->phone ?? $user->phone_number),
+                'email' => $data['email'] ?? ($existingStore?->email ?? $user->email),
+                'street_address' => $data['street_address'] ?? ($existingStore?->street_address ?? null),
+                'city' => $data['city'] ?? ($existingStore?->city ?? null),
+                'state' => $data['state'] ?? ($existingStore?->state ?? null),
+                'zip_code' => $data['zip_code'] ?? ($existingStore?->zip_code ?? null),
+                'latitude' => $data['latitude'] ?? ($existingStore?->latitude ?? null),
+                'longitude' => $data['longitude'] ?? ($existingStore?->longitude ?? null),
                 'logo' => $logoPath,
                 'banner' => $bannerPath,
-                'rating' => 5.00,
-                'reviews_count' => 0,
-                'fulfillment_rate' => 100.00,
-                'avg_prep_time_minutes' => 15,
-                'delivery_fee' => $data['delivery_fee'] ?? 0.00,
-                'delivery_time_text' => '15-20 min',
-                'is_verified' => false,
-                'verification_status' => 'pending',
-                'is_live' => true,
+                'rating' => $existingStore?->rating ?? 5.00,
+                'reviews_count' => $existingStore?->reviews_count ?? 0,
+                'fulfillment_rate' => $existingStore?->fulfillment_rate ?? 100.00,
+                'avg_prep_time_minutes' => $existingStore?->avg_prep_time_minutes ?? 15,
+                'delivery_fee' => $data['delivery_fee'] ?? ($existingStore?->delivery_fee ?? 0.00),
+                'delivery_time_text' => $data['delivery_time_text'] ?? ($existingStore?->delivery_time_text ?? '15-20 min'),
+                'is_verified' => $existingStore?->is_verified ?? false,
+                'verification_status' => $existingStore?->verification_status ?? 'pending',
+                'is_live' => $existingStore?->is_live ?? true,
             ]
         );
 
         // 4. Save uploaded KYC business documents if provided
         $this->saveStoreDocuments($store, $request);
+
+        // 5. Invalidate caches
+        Cache::tags(['stores', "stores:{$store->id}"])->flush();
+
+        return $store->load(['documents']);
+    }
+
+    /**
+     * Update vendor store profile details, images, and settings
+     */
+    public function updateStoreProfile(Store $store, array $data, Request $request): Store
+    {
+        // 1. Handle logo upload (WebP) and delete old file
+        if ($request->hasFile('logo')) {
+            if ($store->logo) {
+                $this->deleteFile($store->logo);
+            }
+            $store->logo = $this->handleFileUpload($request, 'logo', 'stores/logos', 400, 400, 90, true);
+        }
+
+        // 2. Handle banner upload (WebP) and delete old file
+        if ($request->hasFile('banner')) {
+            if ($store->banner) {
+                $this->deleteFile($store->banner);
+            }
+            $store->banner = $this->handleFileUpload($request, 'banner', 'stores/banners', 1200, 600, 90, true);
+        }
+
+        // 3. Update fillable fields if present
+        $fieldsToUpdate = [
+            'name', 'type', 'owner_name', 'phone', 'email',
+            'street_address', 'city', 'state', 'zip_code',
+            'latitude', 'longitude', 'delivery_fee',
+            'delivery_time_text', 'is_live'
+        ];
+
+        foreach ($fieldsToUpdate as $field) {
+            if (array_key_exists($field, $data)) {
+                $store->{$field} = $data[$field];
+            }
+        }
+
+        $store->save();
+
+        // 4. Invalidate store cache
+        Cache::tags(['stores', "stores:{$store->id}"])->flush();
 
         return $store->load(['documents']);
     }
@@ -209,7 +279,7 @@ class StoreService extends BaseService
             'store' => [
                 'id' => $store->id,
                 'name' => $store->name,
-                'logo' => $store->logo ? url('storage/' . $store->logo) : null,
+                'logo' => format_media_url($store->logo, 'stores/logos'),
                 'is_live' => (bool) $store->is_live,
                 'is_verified' => (bool) $store->is_verified,
                 'rating' => (float) $store->rating,
