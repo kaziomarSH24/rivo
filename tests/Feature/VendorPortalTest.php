@@ -94,7 +94,37 @@ class VendorPortalTest extends TestCase
 
         // Verify Redis cache tag & key exist for dashboard
         $cacheKey = "vendor:dashboard:{$this->store->id}:" . \Carbon\Carbon::today()->toDateString();
-        $this->assertTrue(\Illuminate\Support\Facades\Cache::tags(['vendor_dashboard', 'stores', "stores:{$this->store->id}"])->has($cacheKey));
+        $this->assertTrue(\Illuminate\Support\Facades\Cache::tags(["stores:{$this->store->id}:dashboard", "stores:{$this->store->id}", 'stores'])->has($cacheKey));
+
+        // 2. Simulate order creation -> AutoClearsCache should instantly flush the dashboard cache!
+        $customer = User::factory()->create();
+        $newOrder = Order::create([
+            'order_number' => 'TEST-CACHE-' . uniqid(),
+            'user_id' => $customer->id,
+            'store_id' => $this->store->id,
+            'status' => 'new',
+            'delivery_type' => 'express',
+            'subtotal' => 100.00,
+            'total' => 100.00,
+            'payment_status' => 'paid',
+        ]);
+
+        $this->assertFalse(
+            \Illuminate\Support\Facades\Cache::tags(["stores:{$this->store->id}:dashboard", "stores:{$this->store->id}", 'stores'])->has($cacheKey),
+            'Dashboard cache must be automatically invalidated when a new order is saved'
+        );
+
+        // 3. Subsequent dashboard call must fetch fresh data with updated order count
+        $freshResponse = $this->actingAs($this->vendorUser, 'sanctum')->getJson('/api/v1/vendor/dashboard');
+        $this->assertGreaterThanOrEqual(1, $freshResponse->json('data.order_overview.new'));
+
+        // 4. Update order status -> AutoClearsCache should again instantly flush the cache!
+        $newOrder->update(['status' => 'preparing']);
+
+        $this->assertFalse(
+            \Illuminate\Support\Facades\Cache::tags(["stores:{$this->store->id}:dashboard", "stores:{$this->store->id}", 'stores'])->has($cacheKey),
+            'Dashboard cache must be automatically invalidated when order status is updated'
+        );
     }
 
     public function test_vendor_can_view_and_update_business_profile(): void

@@ -79,6 +79,6 @@ class Store extends Model
     }
     public function getRelatedCacheTags(): array
     {
-        return ['products', 'vendor_dashboard', "stores:{$this->id}"];
+        return ['products', "stores:{$this->id}:dashboard", "stores:{$this->id}"];
     }
 }

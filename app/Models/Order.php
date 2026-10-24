@@ -104,7 +104,7 @@ class Order extends Model
     public function getRelatedCacheTags(): array
     {
         return [
-            'vendor_dashboard',
+            "stores:{$this->store_id}:dashboard",
             "stores:{$this->store_id}",
         ];
     }

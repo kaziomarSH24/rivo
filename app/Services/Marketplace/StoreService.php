@@ -256,7 +256,7 @@ class StoreService extends BaseService
      */
     public function getVendorDashboard(Store $store): array
     {
-        $cacheTags = ['vendor_dashboard', 'stores', "stores:{$store->id}"];
+        $cacheTags = ["stores:{$store->id}:dashboard", "stores:{$store->id}", 'stores'];
         $cacheKey = "vendor:dashboard:{$store->id}:" . Carbon::today()->toDateString();
 
         return Cache::tags($cacheTags)->remember($cacheKey, 300, function () use ($store) {
