@@ -27,11 +27,7 @@ class VendorProductController extends Controller
      */
     public function index(Request $request): JsonResponse
     {
-        $store = $request->user()->store;
-        if (!$store) {
-            return response_error('No store registered for this account.', [], 404);
-        }
-
+        $store = $request->attributes->get('store') ?? $request->user()->store;
         $catalog = $this->productService->getVendorCatalog($store, $request);
 
         return response_success('Catalog retrieved successfully.', new VendorProductCatalogResource($catalog));
@@ -42,11 +38,7 @@ class VendorProductController extends Controller
      */
     public function store(StoreVendorProductRequest $request): JsonResponse
     {
-        $store = $request->user()->store;
-        if (!$store) {
-            return response_error('No store registered for this account.', [], 404);
-        }
-
+        $store = $request->attributes->get('store') ?? $request->user()->store;
         $product = $this->productService->storeProduct($store, $request->validated(), $request);
 
         return response_success('Product published successfully.', new VendorProductCardResource($product), 201);
@@ -57,8 +49,8 @@ class VendorProductController extends Controller
      */
     public function show(Request $request, Product $product): JsonResponse
     {
-        $store = $request->user()->store;
-        if (!$store || $product->store_id !== $store->id) {
+        $store = $request->attributes->get('store') ?? $request->user()->store;
+        if ($product->store_id !== $store->id) {
             return response_error('Unauthorized access to product.', [], 403);
         }
 
@@ -70,8 +62,8 @@ class VendorProductController extends Controller
      */
     public function update(UpdateVendorProductRequest $request, Product $product): JsonResponse
     {
-        $store = $request->user()->store;
-        if (!$store || $product->store_id !== $store->id) {
+        $store = $request->attributes->get('store') ?? $request->user()->store;
+        if ($product->store_id !== $store->id) {
             return response_error('Unauthorized access to product.', [], 403);
         }
 
@@ -85,8 +77,8 @@ class VendorProductController extends Controller
      */
     public function updateStock(UpdateProductStockRequest $request, Product $product): JsonResponse
     {
-        $store = $request->user()->store;
-        if (!$store || $product->store_id !== $store->id) {
+        $store = $request->attributes->get('store') ?? $request->user()->store;
+        if ($product->store_id !== $store->id) {
             return response_error('Unauthorized access to product.', [], 403);
         }
 
@@ -104,8 +96,8 @@ class VendorProductController extends Controller
      */
     public function toggleActive(Request $request, Product $product): JsonResponse
     {
-        $store = $request->user()->store;
-        if (!$store || $product->store_id !== $store->id) {
+        $store = $request->attributes->get('store') ?? $request->user()->store;
+        if ($product->store_id !== $store->id) {
             return response_error('Unauthorized access to product.', [], 403);
         }
 
@@ -122,8 +114,8 @@ class VendorProductController extends Controller
      */
     public function destroy(Request $request, Product $product): JsonResponse
     {
-        $store = $request->user()->store;
-        if (!$store || $product->store_id !== $store->id) {
+        $store = $request->attributes->get('store') ?? $request->user()->store;
+        if ($product->store_id !== $store->id) {
             return response_error('Unauthorized access to product.', [], 403);
         }
 

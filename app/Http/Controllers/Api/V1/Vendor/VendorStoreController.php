@@ -45,11 +45,7 @@ class VendorStoreController extends Controller
      */
     public function dashboard(Request $request): JsonResponse
     {
-        $store = $request->user()->store;
-        if (!$store) {
-            return response_error('No store registered for this account.', [], 404);
-        }
-
+        $store = $request->attributes->get('store') ?? $request->user()->store;
         $data = $this->storeService->getVendorDashboard($store);
 
         return response_success('Vendor dashboard retrieved successfully.', new VendorDashboardResource($data));
@@ -60,11 +56,7 @@ class VendorStoreController extends Controller
      */
     public function profile(Request $request): JsonResponse
     {
-        $store = $request->user()->store;
-        if (!$store) {
-            return response_error('No store registered for this account.', [], 404);
-        }
-
+        $store = $request->attributes->get('store') ?? $request->user()->store;
         return response_success('Business profile retrieved successfully.', new VendorStoreProfileResource($store->load(['documents'])));
     }
 
@@ -73,11 +65,7 @@ class VendorStoreController extends Controller
      */
     public function updateProfile(UpdateVendorStoreRequest $request): JsonResponse
     {
-        $store = $request->user()->store;
-        if (!$store) {
-            return response_error('No store registered for this account.', [], 404);
-        }
-
+        $store = $request->attributes->get('store') ?? $request->user()->store;
         $updatedStore = $this->storeService->updateStoreProfile($store, $request->validated(), $request);
 
         return response_success('Business profile updated successfully.', new VendorStoreProfileResource($updatedStore));
@@ -88,11 +76,7 @@ class VendorStoreController extends Controller
      */
     public function uploadDocument(UploadStoreDocumentRequest $request): JsonResponse
     {
-        $store = $request->user()->store;
-        if (!$store) {
-            return response_error('No store registered for this account.', [], 404);
-        }
-
+        $store = $request->attributes->get('store') ?? $request->user()->store;
         $doc = $this->storeService->uploadDocument($store, $request->validated(), $request);
 
         return response_success('KYC Document uploaded successfully.', new StoreDocumentResource($doc), 201);
@@ -103,8 +87,8 @@ class VendorStoreController extends Controller
      */
     public function deleteDocument(Request $request, StoreDocument $document): JsonResponse
     {
-        $store = $request->user()->store;
-        if (!$store || $document->store_id !== $store->id) {
+        $store = $request->attributes->get('store') ?? $request->user()->store;
+        if ($document->store_id !== $store->id) {
             return response_error('Unauthorized access to this document.', [], 403);
         }
 
@@ -118,11 +102,7 @@ class VendorStoreController extends Controller
      */
     public function analytics(VendorAnalyticsRequest $request): JsonResponse
     {
-        $store = $request->user()->store;
-        if (!$store) {
-            return response_error('No store registered for this account.', [], 404);
-        }
-
+        $store = $request->attributes->get('store') ?? $request->user()->store;
         $period = $request->input('period', 'week');
         $data = $this->storeService->getVendorAnalytics($store, $period);
 
