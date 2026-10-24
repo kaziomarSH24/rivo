@@ -149,6 +149,58 @@ class VendorPortalTest extends TestCase
         $this->assertEquals('Sarah Premium Pets', $this->store->fresh()->name);
     }
 
+    public function test_vendor_can_retrieve_products_catalog_with_counters_and_status_filtering(): void
+    {
+        $response = $this->actingAs($this->vendorUser, 'sanctum')->getJson('/api/v1/vendor/products');
+
+        $response->assertStatus(200)
+            ->assertJson([
+                'ok' => true,
+                'message' => 'Catalog retrieved successfully.',
+            ])
+            ->assertJsonStructure([
+                'data' => [
+                    'counters' => [
+                        'all',
+                        'active',
+                        'draft',
+                        'out_of_stock',
+                    ],
+                    'current_page',
+                    'data' => [
+                        '*' => [
+                            'id',
+                            'name',
+                            'slug',
+                            'sku',
+                            'subtitle',
+                            'image',
+                            'images',
+                            'price',
+                            'formatted_price',
+                            'stock',
+                            'stock_status',
+                            'stock_label',
+                            'status',
+                            'status_label',
+                            'status_color',
+                            'is_active',
+                        ]
+                    ],
+                    'per_page',
+                    'total',
+                ]
+            ]);
+
+        // Test filtering by status
+        $activeResponse = $this->actingAs($this->vendorUser, 'sanctum')->getJson('/api/v1/vendor/products?status=active');
+        $activeResponse->assertStatus(200);
+
+        // Test search
+        $searchResponse = $this->actingAs($this->vendorUser, 'sanctum')->getJson('/api/v1/vendor/products?search=Dog');
+        $searchResponse->assertStatus(200);
+    }
+
     public function test_vendor_can_create_and_manage_products(): void
     {
         // 1. Create product via wizard
