@@ -259,7 +259,7 @@ class StoreService extends BaseService
         $cacheTags = ["stores:{$store->id}:dashboard", "stores:{$store->id}", 'stores'];
         $cacheKey = "vendor:dashboard:{$store->id}:" . Carbon::today()->toDateString();
 
-        return Cache::tags($cacheTags)->remember($cacheKey, 300, function () use ($store) {
+        return $this->rememberCache($cacheKey, function () use ($store) {
             $today = Carbon::today();
 
             // 1. Order status counts (including 'done' / delivered matching Figma overview)
@@ -374,7 +374,7 @@ class StoreService extends BaseService
                 'low_stock_alerts' => $lowStockProducts,
                 'recent_orders' => $recentOrders,
             ];
-        });
+        }, 300, $cacheTags, lock: true);
     }
 
     /**

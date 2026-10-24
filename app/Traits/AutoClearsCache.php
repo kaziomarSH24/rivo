@@ -41,15 +41,26 @@ trait AutoClearsCache
             // Tag 2: The collection tag (e.g., 'users')
             $collectionTag = $tableName;
 
-            // We flush specific item and the collection.
-            Cache::tags([$itemTag, $collectionTag])->flush();
+            try {
+                if (Cache::supportsTags()) {
+                    // 1. Flush only this specific item's cache (e.g., 'users:8') — leaves other items untouched
+                    Cache::tags($itemTag)->flush();
 
-            // If the model defines related cache tags to clear (e.g. ['posts', 'comments'])
-            if (method_exists($model, 'getRelatedCacheTags')) {
-                $relatedTags = $model->getRelatedCacheTags();
-                if (!empty($relatedTags)) {
-                    Cache::tags($relatedTags)->flush();
+                    // 2. Flush the collection cache (e.g., 'users') — ensures lists and pagination show updated data
+                    Cache::tags($collectionTag)->flush();
+
+                    // 3. Flush any related tags if defined on the model (e.g. ['posts', 'comments'])
+                    if (method_exists($model, 'getRelatedCacheTags')) {
+                        $relatedTags = (array) $model->getRelatedCacheTags();
+                        if (!empty($relatedTags)) {
+                            foreach ($relatedTags as $tag) {
+                                Cache::tags($tag)->flush();
+                            }
+                        }
+                    }
                 }
+            } catch (\BadMethodCallException|\Throwable $e) {
+                // Cache driver does not support tagging (e.g. file, database)
             }
         });
     }
