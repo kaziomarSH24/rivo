@@ -4,6 +4,8 @@ namespace App\Http\Controllers\Api\V1\Vendor;
 
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Vendor\UpdateOrderStatusRequest;
+use App\Http\Resources\Vendor\VendorOrderDetailsResource;
+use App\Http\Resources\Vendor\VendorOrderQueueResource;
 use App\Models\Order;
 use App\Services\Marketplace\OrderService;
 use Illuminate\Http\JsonResponse;
@@ -19,35 +21,29 @@ class VendorOrderController extends Controller
     }
 
     /**
-     * List incoming and processed orders for vendor's store using BaseService
+     * List incoming and processed orders for vendor's store with live tab counters & resource formatting matching Figma
      */
     public function index(Request $request): JsonResponse
     {
-        $store = $request->user()->store;
-        if (!$store) {
-            return response_error('No store profile associated with this account.', [], 404);
-        }
+        $store = $request->attributes->get('store') ?? $request->user()->store;
+        $queueData = $this->orderService->getStoreOrdersQueue($store, $request);
 
-        $orders = $this->orderService->getAll(function ($query) use ($store) {
-            $query->where('store_id', $store->id);
-        });
-
-        return response_success('Store orders retrieved successfully.', $orders);
+        return response_success('Store orders retrieved successfully.', new VendorOrderQueueResource($queueData));
     }
 
     /**
-     * View details of a specific store order
+     * View details of a specific store order matching Figma Stepper & Fulfillment views
      */
     public function show(Request $request, Order $order): JsonResponse
     {
-        $store = $request->user()->store;
-        if (!$store || $order->store_id !== $store->id) {
+        $store = $request->attributes->get('store') ?? $request->user()->store;
+        if ($order->store_id !== $store->id) {
             return response_error('Unauthorized access to this order.', [], 403);
         }
 
-        $order->load(['user:id,name,email,avatar', 'items', 'address', 'transaction']);
+        $order->load(['user:id,name,email,avatar,phone_number', 'items.product', 'address', 'transaction']);
 
-        return response_success('Order details retrieved successfully.', $order);
+        return response_success('Order details retrieved successfully.', new VendorOrderDetailsResource($order));
     }
 
     /**
@@ -55,14 +51,14 @@ class VendorOrderController extends Controller
      */
     public function accept(Request $request, Order $order): JsonResponse
     {
-        $store = $request->user()->store;
-        if (!$store || $order->store_id !== $store->id) {
+        $store = $request->attributes->get('store') ?? $request->user()->store;
+        if ($order->store_id !== $store->id) {
             return response_error('Unauthorized access to this order.', [], 403);
         }
 
         try {
             $updated = $this->orderService->vendorAcceptOrder($store, $order);
-            return response_success('Order accepted and moved to preparing.', $updated);
+            return response_success('Order accepted and moved to preparing.', new VendorOrderDetailsResource($updated));
         } catch (\Exception $e) {
             return response_error($e->getMessage(), [], 422);
         }
@@ -73,8 +69,8 @@ class VendorOrderController extends Controller
      */
     public function reject(Request $request, Order $order): JsonResponse
     {
-        $store = $request->user()->store;
-        if (!$store || $order->store_id !== $store->id) {
+        $store = $request->attributes->get('store') ?? $request->user()->store;
+        if ($order->store_id !== $store->id) {
             return response_error('Unauthorized access to this order.', [], 403);
         }
 
@@ -82,7 +78,7 @@ class VendorOrderController extends Controller
 
         try {
             $updated = $this->orderService->vendorRejectOrder($store, $order, $reason);
-            return response_success('Order rejected and inventory restored.', $updated);
+            return response_success('Order rejected and inventory restored.', new VendorOrderDetailsResource($updated));
         } catch (\Exception $e) {
             return response_error($e->getMessage(), [], 422);
         }
@@ -93,14 +89,14 @@ class VendorOrderController extends Controller
      */
     public function updateStatus(UpdateOrderStatusRequest $request, Order $order): JsonResponse
     {
-        $store = $request->user()->store;
-        if (!$store || $order->store_id !== $store->id) {
+        $store = $request->attributes->get('store') ?? $request->user()->store;
+        if ($order->store_id !== $store->id) {
             return response_error('Unauthorized access to this order.', [], 403);
         }
 
         try {
             $updated = $this->orderService->updateFulfillmentStatus($store, $order, $request->input('status'), $request->input('reason'));
-            return response_success('Order fulfillment status updated successfully.', $updated);
+            return response_success('Order fulfillment status updated successfully.', new VendorOrderDetailsResource($updated));
         } catch (\Exception $e) {
             return response_error($e->getMessage(), [], 422);
         }

@@ -272,35 +272,40 @@ Route::middleware(['auth:sanctum', 'throttle:api'])->prefix('v1')->name('api.v1.
     // VENDOR / MERCHANT PORTAL MODULE
     // ==========================================
     Route::prefix('vendor')->group(function () {
-        // Store Onboarding & Profile
-        Route::controller(VendorStoreController::class)->group(function () {
-            Route::post('store', 'store');
-            Route::get('profile', 'profile');
-            Route::post('profile', 'updateProfile');
-            Route::post('documents', 'uploadDocument');
-            Route::delete('documents/{document}', 'deleteDocument');
-            Route::get('dashboard', 'dashboard');
-            Route::get('analytics', 'analytics');
-        });
+        // Store Onboarding (allowed before store registration)
+        Route::post('store', [VendorStoreController::class, 'store']);
 
-        // Catalog & 4-Step Product Wizard
-        Route::prefix('products')->controller(VendorProductController::class)->group(function () {
-            Route::get('/', 'index');
-            Route::post('/', 'store');
-            Route::get('{product}', 'show');
-            Route::post('{product}', 'update');
-            Route::patch('{product}/stock', 'updateStock');
-            Route::patch('{product}/toggle-active', 'toggleActive');
-            Route::delete('{product}', 'destroy');
-        });
+        // All other vendor routes strictly require registered store profile
+        Route::middleware('vendor.store')->group(function () {
+            // Profile & Store Analytics
+            Route::controller(VendorStoreController::class)->group(function () {
+                Route::get('profile', 'profile');
+                Route::post('profile', 'updateProfile');
+                Route::post('documents', 'uploadDocument');
+                Route::delete('documents/{document}', 'deleteDocument');
+                Route::get('dashboard', 'dashboard');
+                Route::get('analytics', 'analytics');
+            });
 
-        // Order Management & Fulfillment Stepper
-        Route::prefix('orders')->controller(VendorOrderController::class)->group(function () {
-            Route::get('/', 'index');
-            Route::get('{order}', 'show');
-            Route::post('{order}/accept', 'accept');
-            Route::post('{order}/reject', 'reject');
-            Route::patch('{order}/status', 'updateStatus');
+            // Catalog & 4-Step Product Wizard
+            Route::prefix('products')->controller(VendorProductController::class)->group(function () {
+                Route::get('/', 'index');
+                Route::post('/', 'store');
+                Route::get('{product}', 'show');
+                Route::post('{product}', 'update');
+                Route::patch('{product}/stock', 'updateStock');
+                Route::patch('{product}/toggle-active', 'toggleActive');
+                Route::delete('{product}', 'destroy');
+            });
+
+            // Order Management & Fulfillment Stepper
+            Route::prefix('orders')->controller(VendorOrderController::class)->group(function () {
+                Route::get('/', 'index');
+                Route::get('{order}', 'show');
+                Route::post('{order}/accept', 'accept');
+                Route::post('{order}/reject', 'reject');
+                Route::patch('{order}/status', 'updateStatus');
+            });
         });
     });
 

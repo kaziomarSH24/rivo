@@ -37,6 +37,7 @@ return Application::configure(basePath: dirname(__DIR__))
 
         $middleware->alias([
             'pro' => \App\Http\Middleware\CheckProSubscription::class,
+            'vendor.store' => \App\Http\Middleware\EnsureVendorStoreRegistered::class,
         ]);
 
         $middleware->redirectGuestsTo(function (Request $request) {
@@ -89,5 +90,3 @@ return Application::configure(basePath: dirname(__DIR__))
             }
         });
     })->create();
-
-

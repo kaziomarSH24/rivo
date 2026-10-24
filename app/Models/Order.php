@@ -101,9 +101,11 @@ class Order extends Model
     {
         return $query->where('status', 'cancelled');
     }
+
     public function getRelatedCacheTags(): array
     {
         return [
+            "stores:{$this->store_id}:orders",
             "stores:{$this->store_id}:dashboard",
             "stores:{$this->store_id}:analytics",
             "stores:{$this->store_id}",

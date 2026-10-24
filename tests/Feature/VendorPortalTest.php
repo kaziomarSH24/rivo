@@ -351,49 +351,193 @@ class VendorPortalTest extends TestCase
     {
         $customer = User::firstOrCreate(
             ['email' => 'buyer_test@yopmail.com'],
-            ['name' => 'Buyer', 'password' => bcrypt('password123')]
+            ['name' => 'Sarah Mitchell', 'password' => bcrypt('password123')]
         );
 
         $order = Order::create([
-            'order_number' => 'RIV-VEND1',
+            'order_number' => 'ORD-4521',
             'user_id' => $customer->id,
             'store_id' => $this->store->id,
             'status' => 'new',
             'delivery_type' => 'express',
-            'subtotal' => 50.00,
+            'subtotal' => 80.51,
             'delivery_fee' => 3.99,
-            'tax' => 5.00,
-            'total' => 58.99,
+            'tax' => 0.00,
+            'total' => 84.50,
             'payment_method' => 'card',
             'payment_status' => 'paid',
         ]);
 
-        // 1. Accept order -> preparing
+        // 1. Fetch vendor order queue matching Figma UI pills & card resources
+        $queueResponse = $this->actingAs($this->vendorUser, 'sanctum')->getJson('/api/v1/vendor/orders');
+        $queueResponse->assertStatus(200)
+            ->assertJson([
+                'ok' => true,
+                'message' => 'Store orders retrieved successfully.',
+            ])
+            ->assertJsonStructure([
+                'data' => [
+                    'counters' => [
+                        'all', 'today', 'new', 'preparing', 'ready', 'out_for_delivery', 'delivered', 'cancelled',
+                    ],
+                    'current_page',
+                    'data' => [
+                        '*' => [
+                            'id', 'order_number', 'status', 'status_label', 'status_color',
+                            'customer' => ['name', 'initials', 'avatar'],
+                            'delivery_type', 'delivery_type_label', 'items_count', 'items_summary',
+                            'total', 'formatted_total', 'available_actions',
+                        ]
+                    ],
+                    'total',
+                ]
+            ]);
+
+        // 2. Fetch specific order details matching Figma Stepper & Fulfillment views
+        $detailsResponse = $this->actingAs($this->vendorUser, 'sanctum')->getJson("/api/v1/vendor/orders/{$order->id}");
+        $detailsResponse->assertStatus(200)
+            ->assertJson([
+                'ok' => true,
+                'data' => [
+                    'order_number' => 'ORD-4521',
+                    'status' => 'new',
+                    'stepper' => [
+                        'current_step' => 1,
+                    ],
+                    'fulfillment_tracking' => [
+                        'badge' => 'Order Received',
+                    ],
+                ]
+            ]);
+
+        // 3. Accept order -> moves to 'preparing' with amber badge
         $acceptResponse = $this->actingAs($this->vendorUser, 'sanctum')->postJson("/api/v1/vendor/orders/{$order->id}/accept");
-        $acceptResponse->assertStatus(200);
+        $acceptResponse->assertStatus(200)
+            ->assertJson([
+                'ok' => true,
+                'data' => [
+                    'status' => 'preparing',
+                    'status_label' => 'Preparing',
+                    'status_color' => 'amber',
+                    'stepper' => ['current_step' => 2],
+                ]
+            ]);
         $this->assertEquals('preparing', $order->fresh()->status);
 
-        // 2. Update status -> ready_for_pickup
+        // 4. Update status -> ready_for_pickup
         $readyResponse = $this->actingAs($this->vendorUser, 'sanctum')->patchJson("/api/v1/vendor/orders/{$order->id}/status", [
             'status' => 'ready_for_pickup',
         ]);
-        $readyResponse->assertStatus(200);
+        $readyResponse->assertStatus(200)
+            ->assertJson([
+                'ok' => true,
+                'data' => [
+                    'status' => 'ready_for_pickup',
+                    'status_label' => 'Ready',
+                ]
+            ]);
         $this->assertEquals('ready_for_pickup', $order->fresh()->status);
 
-        // 3. Update status -> out_for_delivery
+        // 5. Update status -> out_for_delivery
         $outResponse = $this->actingAs($this->vendorUser, 'sanctum')->patchJson("/api/v1/vendor/orders/{$order->id}/status", [
             'status' => 'out_for_delivery',
         ]);
-        $outResponse->assertStatus(200);
+        $outResponse->assertStatus(200)
+            ->assertJson([
+                'ok' => true,
+                'data' => [
+                    'status' => 'out_for_delivery',
+                    'status_label' => 'Out for Delivery',
+                ]
+            ]);
         $this->assertEquals('out_for_delivery', $order->fresh()->status);
 
-        // 4. Update status -> delivered
+        // 6. Update status -> delivered
         $delResponse = $this->actingAs($this->vendorUser, 'sanctum')->patchJson("/api/v1/vendor/orders/{$order->id}/status", [
             'status' => 'delivered',
         ]);
-        $delResponse->assertStatus(200);
+        $delResponse->assertStatus(200)
+            ->assertJson([
+                'ok' => true,
+                'data' => [
+                    'status' => 'delivered',
+                    'status_label' => 'Delivered',
+                ]
+            ]);
         $this->assertEquals('delivered', $order->fresh()->status);
         $this->assertNotNull($order->fresh()->delivered_at);
+    }
+
+    public function test_vendor_orders_multitenant_isolation_and_middleware(): void
+    {
+        // 1. Create second vendor with independent store
+        $vendorB = User::factory()->create([
+            'email' => 'vendor_b_' . uniqid() . '@yopmail.com',
+            'password' => bcrypt('password123'),
+        ]);
+        $vendorB->assignRole('vendor');
+
+        $storeB = Store::create([
+            'user_id' => $vendorB->id,
+            'name' => 'Store B Pet Emporium',
+            'slug' => 'store-b-' . uniqid(),
+            'type' => 'pet_shop',
+            'delivery_fee' => 4.00,
+            'is_live' => true,
+        ]);
+
+        // Create Order belonging to Store A
+        $customer = User::factory()->create();
+        $orderA = Order::create([
+            'order_number' => 'ORD-SECURE-A',
+            'user_id' => $customer->id,
+            'store_id' => $this->store->id,
+            'status' => 'new',
+            'delivery_type' => 'delivery',
+            'subtotal' => 40.00,
+            'total' => 44.00,
+        ]);
+
+        // 2. Vendor B attempts to view Store A's order -> 403 Forbidden!
+        $unauthorizedShow = $this->actingAs($vendorB, 'sanctum')->getJson("/api/v1/vendor/orders/{$orderA->id}");
+        $unauthorizedShow->assertStatus(403);
+
+        // 3. Vendor B attempts to accept Store A's order -> 403 Forbidden!
+        $unauthorizedAccept = $this->actingAs($vendorB, 'sanctum')->postJson("/api/v1/vendor/orders/{$orderA->id}/accept");
+        $unauthorizedAccept->assertStatus(403);
+
+        // 4. Vendor B attempts to reject Store A's order -> 403 Forbidden!
+        $unauthorizedReject = $this->actingAs($vendorB, 'sanctum')->postJson("/api/v1/vendor/orders/{$orderA->id}/reject");
+        $unauthorizedReject->assertStatus(403);
+
+        // 5. Vendor B attempts to update status of Store A's order -> 403 Forbidden!
+        $unauthorizedStatus = $this->actingAs($vendorB, 'sanctum')->patchJson("/api/v1/vendor/orders/{$orderA->id}/status", [
+            'status' => 'preparing'
+        ]);
+        $unauthorizedStatus->assertStatus(403);
+
+        // 6. Vendor without a store calling vendor routes -> intercepted by EnsureVendorStoreRegistered with 404!
+        $userWithoutStore = User::factory()->create();
+        $noStoreResponse = $this->actingAs($userWithoutStore, 'sanctum')->getJson('/api/v1/vendor/orders');
+        $noStoreResponse->assertStatus(404)
+            ->assertJson([
+                'ok' => false,
+                'message' => 'No store profile associated with this account.',
+            ]);
+
+        // 7. Store A legitimate rejection flow
+        $rejectResponse = $this->actingAs($this->vendorUser, 'sanctum')->postJson("/api/v1/vendor/orders/{$orderA->id}/reject", [
+            'reason' => 'Item currently out of stock at counter',
+        ]);
+        $rejectResponse->assertStatus(200)
+            ->assertJson([
+                'ok' => true,
+                'message' => 'Order rejected and inventory restored.',
+                'data' => [
+                    'status' => 'cancelled',
+                    'rejection_reason' => 'Item currently out of stock at counter',
+                ]
+            ]);
     }
 
     public function test_vendor_can_view_sales_analytics(): void

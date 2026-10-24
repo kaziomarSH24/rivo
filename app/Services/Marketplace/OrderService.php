@@ -13,6 +13,7 @@ use App\Models\UserAddress;
 use App\Services\BaseService;
 use App\Services\Payment\PaymentGatewayManager;
 use Carbon\Carbon;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Spatie\QueryBuilder\AllowedFilter;
@@ -44,6 +45,68 @@ class OrderService extends BaseService
     protected function getAllowedSorts(): array
     {
         return ['created_at', 'total', 'placed_at'];
+    }
+
+    /**
+     * Get store orders queue with live tab counters, status filters, search, and Redis caching matching Figma
+     */
+    public function getStoreOrdersQueue(Store $store, Request $request): array
+    {
+        $status = $request->input('status', $request->input('filter.status', 'all'));
+        $search = $request->input('search', $request->input('filter.search', ''));
+        $page = (int) $request->input('page', 1);
+        $perPage = (int) $request->input('per_page', 15);
+        $sort = $request->input('sort', '-created_at');
+
+        $cacheTags = ["stores:{$store->id}:orders", "stores:{$store->id}", 'stores'];
+        $cacheKey = "vendor:orders:queue:{$store->id}:s_{$status}:q_" . md5($search) . ":p_{$page}:pp_{$perPage}:sort_{$sort}";
+
+        return $this->rememberCache($cacheKey, function () use ($store, $status, $search, $perPage) {
+            $baseQuery = Order::where('store_id', $store->id);
+            $today = Carbon::today();
+
+            // 1. Compute live tab counters matching Figma UI pills (New, Preparing, Ready, Out for Delivery, Delivered, Cancelled)
+            $counters = [
+                'all' => (clone $baseQuery)->count(),
+                'today' => (clone $baseQuery)->whereDate('created_at', $today)->count(),
+                'new' => (clone $baseQuery)->where('status', 'new')->count(),
+                'preparing' => (clone $baseQuery)->where('status', 'preparing')->count(),
+                'ready' => (clone $baseQuery)->where('status', 'ready_for_pickup')->count(),
+                'ready_for_pickup' => (clone $baseQuery)->where('status', 'ready_for_pickup')->count(),
+                'out_for_delivery' => (clone $baseQuery)->where('status', 'out_for_delivery')->count(),
+                'delivered' => (clone $baseQuery)->where('status', 'delivered')->count(),
+                'cancelled' => (clone $baseQuery)->where('status', 'cancelled')->count(),
+            ];
+
+            // 2. Fetch filtered orders with eager loaded customer, items, and address
+            $query = Order::where('store_id', $store->id)
+                ->with(['user:id,name,email,avatar,phone_number', 'items.product', 'address', 'transaction']);
+
+            if ($status && $status !== 'all') {
+                if ($status === 'ready') {
+                    $query->where('status', 'ready_for_pickup');
+                } else {
+                    $query->where('status', $status);
+                }
+            }
+
+            if (!empty($search)) {
+                $query->where(function ($q) use ($search) {
+                    $q->where('order_number', 'like', "%{$search}%")
+                      ->orWhereHas('user', function ($uq) use ($search) {
+                          $uq->where('name', 'like', "%{$search}%")
+                             ->orWhere('email', 'like', "%{$search}%");
+                      });
+                });
+            }
+
+            $paginator = $query->latest('id')->paginate($perPage);
+
+            return [
+                'counters' => $counters,
+                'paginator' => $paginator,
+            ];
+        }, ttl: 300, tags: $cacheTags, lock: true);
     }
 
     /**
@@ -256,7 +319,7 @@ class OrderService extends BaseService
         $order->status = 'preparing';
         $order->save();
 
-        return $order->load(['items', 'user']);
+        return $order->load(['items.product', 'user:id,name,email,avatar,phone_number', 'address', 'transaction']);
     }
 
     /**
@@ -300,7 +363,7 @@ class OrderService extends BaseService
                 }
             }
 
-            return $order->load(['items', 'user', 'transaction']);
+            return $order->load(['items.product', 'user:id,name,email,avatar,phone_number', 'address', 'transaction']);
         });
     }
 
@@ -340,7 +403,7 @@ class OrderService extends BaseService
         }
         $order->save();
 
-        return $order->load(['items', 'user', 'transaction']);
+        return $order->load(['items.product', 'user:id,name,email,avatar,phone_number', 'address', 'transaction']);
     }
 
     /**
@@ -412,4 +475,3 @@ class OrderService extends BaseService
         return $query->paginate(15);
     }
 }
-
