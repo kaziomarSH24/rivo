@@ -99,6 +99,7 @@ class ProductService extends BaseService
     /**
      * Create product with 4-step wizard data.
      * Supports both uploaded binary images (multipart/form-data) and image URLs/strings (application/json).
+     * Cache invalidation is handled automatically by the Product model's AutoClearsCache trait.
      */
     public function storeProduct(Store $store, array $data, Request $request): Product
     {
@@ -153,22 +154,12 @@ class ProductService extends BaseService
             }
         }
 
-        // 4. Invalidate related caches
-        $this->flushCacheTags([
-            "stores:{$store->id}:products",
-            "stores:{$store->id}:dashboard",
-            "stores:{$store->id}:analytics",
-            "stores:{$store->id}",
-            'stores',
-            'products',
-            'product_categories',
-        ]);
-
         return $product->load(['category', 'brand', 'variants']);
     }
 
     /**
      * Update product details, image assets, and variants.
+     * Cache invalidation is handled automatically by the Product model's AutoClearsCache trait.
      */
     public function updateProduct(Product $product, array $data, Request $request): Product
     {
@@ -208,79 +199,37 @@ class ProductService extends BaseService
             }
         }
 
-        // 5. Invalidate related caches
-        $this->flushCacheTags([
-            "stores:{$updatedProduct->store_id}:products",
-            "stores:{$updatedProduct->store_id}:dashboard",
-            "stores:{$updatedProduct->store_id}:analytics",
-            "stores:{$updatedProduct->store_id}",
-            'stores',
-            'products',
-            'product_categories',
-        ]);
-
         return $updatedProduct->load(['category', 'brand', 'variants']);
     }
 
     /**
-     * Quick stock stepper adjustment with cache invalidation
+     * Quick stock stepper adjustment (Cache automatically cleared via model events)
      */
     public function updateStock(Product $product, int $newStock): Product
     {
         $product->stock = max(0, $newStock);
         $product->save();
 
-        $this->flushCacheTags([
-            "stores:{$product->store_id}:products",
-            "stores:{$product->store_id}:dashboard",
-            "stores:{$product->store_id}:analytics",
-            "stores:{$product->store_id}",
-            'stores',
-            'products',
-        ]);
-
         return $product;
     }
 
     /**
-     * Toggle product visibility with cache invalidation
+     * Toggle product visibility (Cache automatically cleared via model events)
      */
     public function toggleActive(Product $product): Product
     {
         $product->is_active = !$product->is_active;
         $product->save();
 
-        $this->flushCacheTags([
-            "stores:{$product->store_id}:products",
-            "stores:{$product->store_id}:dashboard",
-            "stores:{$product->store_id}:analytics",
-            "stores:{$product->store_id}",
-            'stores',
-            'products',
-        ]);
-
         return $product;
     }
 
     /**
-     * Delete product safely and invalidate cache
+     * Delete product safely (Cache automatically cleared via model events)
      */
     public function deleteProduct(Product $product): bool
     {
-        $storeId = $product->store_id;
-        $result = $product->delete();
-
-        $this->flushCacheTags([
-            "stores:{$storeId}:products",
-            "stores:{$storeId}:dashboard",
-            "stores:{$storeId}:analytics",
-            "stores:{$storeId}",
-            'stores',
-            'products',
-            'product_categories',
-        ]);
-
-        return (bool) $result;
+        return (bool) $product->delete();
     }
 
     /**
