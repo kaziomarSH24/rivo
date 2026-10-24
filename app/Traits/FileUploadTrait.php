@@ -159,7 +159,19 @@ trait FileUploadTrait
      *
      * @param string|null $path - Path to the file (e.g., 'posts/image.jpg')
      */
-     public function deleteFile(?string $pathOrUrl): void
+    /**
+     * Deletes multiple files from storage.
+     *
+     * @param array $pathsOrUrls - Array of file paths or URLs
+     */
+    public function deleteMultipleFiles(array $pathsOrUrls): void
+    {
+        foreach ($pathsOrUrls as $path) {
+            $this->deleteFile($path);
+        }
+    }
+
+    public function deleteFile(?string $pathOrUrl): void
     {
         if (!$pathOrUrl) {
             return;
