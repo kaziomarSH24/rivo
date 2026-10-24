@@ -326,18 +326,105 @@ class MarketplaceTest extends TestCase
 
     public function test_customer_can_submit_product_review(): void
     {
+        // 1. Create a cancelled order and attempt to review it - must fail with 422
+        $cancelledOrder = Order::create([
+            'order_number' => 'RIV-CANC1',
+            'user_id' => $this->customer->id,
+            'store_id' => $this->store->id,
+            'status' => 'cancelled',
+            'delivery_type' => 'express',
+            'subtotal' => 49.99,
+            'delivery_fee' => 0,
+            'tax' => 4.12,
+            'total' => 49.11,
+            'payment_method' => 'stripe',
+            'payment_status' => 'refunded',
+        ]);
+        $cancelledOrder->items()->create([
+            'product_id' => $this->product->id,
+            'product_name' => $this->product->name,
+            'price' => $this->product->price,
+            'quantity' => 1,
+            'total' => $this->product->price,
+        ]);
+
+        $failResponse = $this->actingAs($this->customer, 'sanctum')->postJson('/api/v1/marketplace/reviews', [
+            'reviewable_type' => 'product',
+            'reviewable_id' => $this->product->id,
+            'order_id' => $cancelledOrder->id,
+            'rating' => 5,
+            'comment' => 'Review on cancelled order should fail!',
+        ]);
+
+        $failResponse->assertStatus(422)
+            ->assertJson(['ok' => false]);
+
+        // 2. Create a delivered order and review it - must succeed with 201
+        $deliveredOrder = Order::create([
+            'order_number' => 'RIV-DELV1',
+            'user_id' => $this->customer->id,
+            'store_id' => $this->store->id,
+            'status' => 'delivered',
+            'delivery_type' => 'express',
+            'subtotal' => 49.99,
+            'delivery_fee' => 0,
+            'tax' => 4.12,
+            'total' => 49.11,
+            'payment_method' => 'stripe',
+            'payment_status' => 'paid',
+        ]);
+        $deliveredOrder->items()->create([
+            'product_id' => $this->product->id,
+            'product_name' => $this->product->name,
+            'price' => $this->product->price,
+            'quantity' => 1,
+            'total' => $this->product->price,
+        ]);
+
         $reviewResponse = $this->actingAs($this->customer, 'sanctum')->postJson('/api/v1/marketplace/reviews', [
             'reviewable_type' => 'product',
             'reviewable_id' => $this->product->id,
+            'order_id' => $deliveredOrder->id,
             'rating' => 5,
             'comment' => 'Great product, high quality!',
         ]);
 
         $reviewResponse->assertStatus(201)
-            ->assertJson(['ok' => true]);
+            ->assertJson([
+                'ok' => true,
+                'data' => [
+                    'rating' => 5,
+                    'is_verified_purchase' => true,
+                    'order_id' => $deliveredOrder->id,
+                ],
+            ]);
 
         $this->assertEquals(5, $this->product->fresh()->rating);
         $this->assertEquals(1, $this->product->fresh()->reviews_count);
+
+        // 3. Duplicate review on the same order must fail with 422
+        $duplicateResponse = $this->actingAs($this->customer, 'sanctum')->postJson('/api/v1/marketplace/reviews', [
+            'reviewable_type' => 'product',
+            'reviewable_id' => $this->product->id,
+            'order_id' => $deliveredOrder->id,
+            'rating' => 4,
+            'comment' => 'Duplicate review!',
+        ]);
+
+        $duplicateResponse->assertStatus(422);
+
+        // 4. Get product reviews summary & breakdown (API #26)
+        $summaryResponse = $this->actingAs($this->customer, 'sanctum')->getJson("/api/v1/marketplace/products/{$this->product->id}/reviews");
+        $summaryResponse->assertStatus(200)
+            ->assertJson(['ok' => true])
+            ->assertJsonStructure([
+                'data' => [
+                    'rating',
+                    'reviews_count',
+                    'breakdown',
+                    'reviews' => ['data', 'total'],
+                ],
+            ]);
     }
 
     public function test_customer_can_manage_delivery_addresses(): void

@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api\V1\Marketplace;
 
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Marketplace\StoreReviewRequest;
+use App\Http\Resources\Marketplace\ReviewResource;
 use App\Models\Product;
 use App\Models\Store;
 use App\Services\Marketplace\ReviewService;
@@ -33,7 +34,7 @@ class ReviewController extends Controller
                 $request
             );
 
-            return response_success('Review submitted successfully.', $review, 201);
+            return response_success('Review submitted successfully.', new ReviewResource($review), 201);
         } catch (\Exception $e) {
             return response_error($e->getMessage(), [], 422);
         }

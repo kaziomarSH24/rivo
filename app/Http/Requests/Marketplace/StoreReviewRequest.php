@@ -11,11 +11,13 @@ class StoreReviewRequest extends BaseRequest
         return [
             'reviewable_type' => 'required|string|in:product,store',
             'reviewable_id' => 'required|integer',
-            'order_id' => 'nullable|exists:orders,id',
+            'order_id' => 'nullable|integer|exists:orders,id',
             'rating' => 'required|integer|min:1|max:5',
             'comment' => 'nullable|string|max:1000',
             'is_anonymous' => 'nullable|boolean',
             'photo' => 'nullable|image|max:5120',
+            'photos' => 'nullable|array',
+            'photos.*' => 'image|max:5120',
         ];
     }
 }
