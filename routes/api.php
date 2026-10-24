@@ -324,6 +324,10 @@ Route::middleware(['auth:sanctum', 'throttle:api'])->prefix('v1')->name('api.v1.
         // Reviews
         Route::controller(ReviewController::class)->group(function () {
             Route::post('reviews', 'store');
+            Route::post('reviews/{review}', 'update'); // Supports multipart/form-data with new photos
+            Route::put('reviews/{review}', 'update');
+            Route::patch('reviews/{review}', 'update');
+            Route::delete('reviews/{review}', 'destroy');
             Route::get('products/{product}/reviews', 'productReviews');
             Route::get('stores/{store}/reviews', 'storeReviews');
         });

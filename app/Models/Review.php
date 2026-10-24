@@ -3,14 +3,16 @@
 namespace App\Models;
 
 use App\Traits\AutoClearsCache;
+use App\Traits\FileUploadTrait;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\MorphTo;
+use Illuminate\Support\Facades\Cache;
 
 class Review extends Model
 {
-    use HasFactory, AutoClearsCache;
+    use HasFactory, AutoClearsCache, FileUploadTrait;
 
     protected $fillable = [
         'user_id',
@@ -31,18 +33,11 @@ class Review extends Model
 
     protected static function booted(): void
     {
-        // When a review is deleted, clean up physical files and recalculate ratings
+        // When a review is deleted, clean up physical files via FileUploadTrait and recalculate ratings
         static::deleted(function (Review $review) {
-            // 1. Delete physical photo files from disk
+            // 1. Delete physical photo files from disk using centralized FileUploadTrait
             if (!empty($review->photos) && is_array($review->photos)) {
-                foreach ($review->photos as $photoPath) {
-                    if ($photoPath) {
-                        $cleanPath = str_replace('/storage/', '', parse_url($photoPath, PHP_URL_PATH) ?? $photoPath);
-                        if (\Illuminate\Support\Facades\Storage::disk('public')->exists($cleanPath)) {
-                            \Illuminate\Support\Facades\Storage::disk('public')->delete($cleanPath);
-                        }
-                    }
-                }
+                $review->deleteMultipleFiles($review->photos);
             }
 
             // 2. Recalculate parent Product or Store rating and reviews_count
@@ -56,7 +51,7 @@ class Review extends Model
                 ]);
 
                 $table = $reviewable->getTable();
-                \Illuminate\Support\Facades\Cache::tags(['reviews', "{$table}:{$reviewable->id}", $table])->flush();
+                Cache::tags(['reviews', "{$table}:{$reviewable->id}", $table])->flush();
             }
         });
     }

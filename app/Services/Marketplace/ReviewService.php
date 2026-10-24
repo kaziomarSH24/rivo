@@ -199,4 +199,76 @@ class ReviewService extends BaseService
             ];
         });
     }
+
+    /**
+     * Update an existing review
+     */
+    public function updateReview(User $user, Review $review, array $data, Request $request): Review
+    {
+        if ($review->user_id !== $user->id && !(method_exists($user, 'hasRole') && $user->hasRole('admin'))) {
+            throw new \Exception('Unauthorized to update this review.');
+        }
+
+        $existingPhotos = $review->photos ?? [];
+
+        // Remove any specific photos requested by client
+        if (!empty($data['remove_photos']) && is_array($data['remove_photos'])) {
+            foreach ($data['remove_photos'] as $removePath) {
+                $this->deleteFile($removePath);
+                $existingPhotos = array_values(array_filter($existingPhotos, fn($p) => $p !== $removePath));
+            }
+        }
+
+        // Upload and optimize new photos via FileUploadTrait
+        if ($request->hasFile('photos')) {
+            $newPhotos = $this->handleMultipleFileUpload(
+                $request,
+                'photos',
+                'reviews',
+                width: 1200,
+                quality: 85,
+                forceWebp: true
+            );
+            $existingPhotos = array_merge($existingPhotos, $newPhotos);
+        }
+
+        if (isset($data['rating'])) {
+            $review->rating = max(1, min(5, (int) $data['rating']));
+        }
+        if (array_key_exists('comment', $data)) {
+            $review->comment = $data['comment'];
+        }
+        if (isset($data['is_anonymous'])) {
+            $review->is_anonymous = filter_var($data['is_anonymous'], FILTER_VALIDATE_BOOLEAN);
+        }
+
+        $review->photos = $existingPhotos;
+        $review->save();
+
+        // Recalculate parent rating and reviews_count
+        $model = $review->reviewable;
+        if ($model) {
+            $avgRating = $model->reviews()->avg('rating') ?: 5.0;
+            $model->rating = round($avgRating, 1);
+            $model->save();
+
+            // Clear cache tags
+            $modelTable = $model->getTable();
+            Cache::tags(['reviews', "{$modelTable}:{$model->id}", $modelTable])->flush();
+        }
+
+        return $review->load(['user:id,name,avatar']);
+    }
+
+    /**
+     * Delete an existing review
+     */
+    public function deleteReview(User $user, Review $review): bool
+    {
+        if ($review->user_id !== $user->id && !(method_exists($user, 'hasRole') && $user->hasRole('admin'))) {
+            throw new \Exception('Unauthorized to delete this review.');
+        }
+
+        return (bool) $review->delete();
+    }
 }

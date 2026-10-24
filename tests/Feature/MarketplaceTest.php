@@ -425,6 +425,27 @@ class MarketplaceTest extends TestCase
                     'reviews' => ['data', 'total'],
                 ],
             ]);
+
+        $reviewId = $reviewResponse->json('data.id');
+
+        // 5. Update review (Edit Review API)
+        $updateResponse = $this->actingAs($this->customer, 'sanctum')->putJson("/api/v1/marketplace/reviews/{$reviewId}", [
+            'rating' => 4,
+            'comment' => 'Updated review text: Still good!',
+        ]);
+        $updateResponse->assertStatus(200)
+            ->assertJson(['ok' => true, 'data' => ['rating' => 4]]);
+        $this->assertEquals(4, $this->product->fresh()->rating);
+
+        // 6. Another user cannot delete this review (403 Forbidden)
+        $otherUser = User::factory()->create();
+        $unauthorizedDelete = $this->actingAs($otherUser, 'sanctum')->deleteJson("/api/v1/marketplace/reviews/{$reviewId}");
+        $unauthorizedDelete->assertStatus(403);
+
+        // 7. Owner deletes review (Delete Review API)
+        $deleteResponse = $this->actingAs($this->customer, 'sanctum')->deleteJson("/api/v1/marketplace/reviews/{$reviewId}");
+        $deleteResponse->assertStatus(200);
+        $this->assertEquals(0, $this->product->fresh()->reviews_count);
     }
 
     public function test_customer_can_manage_delivery_addresses(): void
