@@ -8,6 +8,7 @@ use App\Http\Requests\Vendor\UpdateProductStockRequest;
 use App\Http\Requests\Vendor\UpdateVendorProductRequest;
 use App\Models\Product;
 use App\Services\Marketplace\ProductService;
+use App\Http\Resources\Vendor\VendorProductCardResource;
 use App\Http\Resources\Vendor\VendorProductCatalogResource;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -48,7 +49,7 @@ class VendorProductController extends Controller
 
         $product = $this->productService->storeProduct($store, $request->validated(), $request);
 
-        return response_success('Product published successfully.', $product, 201);
+        return response_success('Product published successfully.', new VendorProductCardResource($product), 201);
     }
 
     /**
@@ -61,7 +62,7 @@ class VendorProductController extends Controller
             return response_error('Unauthorized access to product.', [], 403);
         }
 
-        return response_success('Product details retrieved.', $product->load(['category', 'brand', 'variants']));
+        return response_success('Product details retrieved.', new VendorProductCardResource($product->load(['category', 'brand', 'variants'])));
     }
 
     /**
@@ -76,7 +77,7 @@ class VendorProductController extends Controller
 
         $updatedProduct = $this->productService->updateProduct($product, $request->validated(), $request);
 
-        return response_success('Product updated successfully.', $updatedProduct);
+        return response_success('Product updated successfully.', new VendorProductCardResource($updatedProduct));
     }
 
     /**
@@ -126,7 +127,7 @@ class VendorProductController extends Controller
             return response_error('Unauthorized access to product.', [], 403);
         }
 
-        $product->delete();
+        $this->productService->deleteProduct($product);
 
         return response_success('Product deleted successfully.', []);
     }

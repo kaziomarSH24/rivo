@@ -203,35 +203,148 @@ class VendorPortalTest extends TestCase
 
     public function test_vendor_can_create_and_manage_products(): void
     {
-        // 1. Create product via wizard
+        Storage::fake('public');
+
+        // 1. Warm catalog cache first
+        $catalogResponse = $this->actingAs($this->vendorUser, 'sanctum')->getJson('/api/v1/vendor/products');
+        $catalogResponse->assertStatus(200);
+        $initialTotal = $catalogResponse->json('data.total');
+
+        // 2. Create product via JSON with image URLs & variants
         $createResponse = $this->actingAs($this->vendorUser, 'sanctum')->postJson('/api/v1/vendor/products', [
             'category_id' => $this->category->id,
             'brand_id' => $this->brand->id,
             'name' => 'Organic Cat Treats',
+            'description' => 'Delicious all-natural salmon treats for cats.',
             'price' => 15.00,
+            'discount_price' => 12.50,
             'stock' => 20,
+            'low_stock_threshold' => 5,
             'pet_type' => 'cat',
             'is_active' => true,
+            'is_online' => true,
+            'is_instore' => true,
+            'images' => ['https://images.unsplash.com/photo-1589924691995-400dc9ecc119?w=800'],
+            'variants' => [
+                [
+                    'flavor' => 'Salmon',
+                    'size_lbs' => '5 lbs',
+                    'price' => 15.00,
+                    'stock' => 20,
+                ]
+            ],
         ]);
 
-        $createResponse->assertStatus(201);
-        $productId = $createResponse->json('data.id');
+        $createResponse->assertStatus(201)
+            ->assertJson([
+                'ok' => true,
+                'message' => 'Product published successfully.',
+            ])
+            ->assertJsonStructure([
+                'data' => [
+                    'id', 'name', 'slug', 'sku', 'subtitle', 'image', 'images', 'price',
+                    'formatted_price', 'original_price', 'formatted_original_price',
+                    'stock', 'stock_status', 'stock_label', 'status', 'status_label',
+                    'status_color', 'is_active', 'category', 'brand', 'variants',
+                ]
+            ]);
 
-        // 2. Quick stock stepper adjustment
+        $productId = $createResponse->json('data.id');
+        $this->assertEquals(12.50, (float) $createResponse->json('data.price'));
+        $this->assertEquals(15.00, (float) $createResponse->json('data.original_price'));
+        $this->assertCount(1, $createResponse->json('data.variants'));
+
+        // Verify cache was invalidated and new product shows in catalog
+        $freshCatalog = $this->actingAs($this->vendorUser, 'sanctum')->getJson('/api/v1/vendor/products');
+        $this->assertEquals($initialTotal + 1, $freshCatalog->json('data.total'));
+
+        // 3. Show product details
+        $showResponse = $this->actingAs($this->vendorUser, 'sanctum')->getJson("/api/v1/vendor/products/{$productId}");
+        $showResponse->assertStatus(200)
+            ->assertJson([
+                'ok' => true,
+                'data' => [
+                    'id' => $productId,
+                    'name' => 'Organic Cat Treats',
+                    'pet_type' => 'cat',
+                ]
+            ]);
+
+        // 4. Update product details & sync variants
+        $updateResponse = $this->actingAs($this->vendorUser, 'sanctum')->postJson("/api/v1/vendor/products/{$productId}", [
+            'name' => 'Organic Cat Treats (Updated)',
+            'price' => 18.00,
+            'variants' => [
+                [
+                    'flavor' => 'Tuna & Salmon',
+                    'size_lbs' => '10 lbs',
+                    'price' => 18.00,
+                    'stock' => 40,
+                ],
+                [
+                    'flavor' => 'Chicken Feast',
+                    'size_lbs' => '5 lbs',
+                    'price' => 12.00,
+                    'stock' => 15,
+                ]
+            ],
+        ]);
+
+        $updateResponse->assertStatus(200)
+            ->assertJson([
+                'ok' => true,
+                'message' => 'Product updated successfully.',
+            ]);
+        $this->assertEquals('Organic Cat Treats (Updated)', $updateResponse->json('data.name'));
+        $this->assertCount(2, $updateResponse->json('data.variants'));
+
+        // 5. Quick stock stepper adjustment
         $stockResponse = $this->actingAs($this->vendorUser, 'sanctum')->patchJson("/api/v1/vendor/products/{$productId}/stock", [
             'stock' => 35,
         ]);
-
         $stockResponse->assertStatus(200)
             ->assertJson([
                 'ok' => true,
                 'data' => ['stock' => 35]
             ]);
 
-        // 3. Toggle active
+        // 6. Toggle active status
         $toggleResponse = $this->actingAs($this->vendorUser, 'sanctum')->patchJson("/api/v1/vendor/products/{$productId}/toggle-active");
         $toggleResponse->assertStatus(200);
         $this->assertFalse((bool) $toggleResponse->json('data.is_active'));
+
+        // 7. Create product via multipart/form-data with binary image file upload and stringified variants
+        $imageFile = UploadedFile::fake()->image('dog_biscuit.jpg', 800, 800);
+        $multipartResponse = $this->actingAs($this->vendorUser, 'sanctum')->post('/api/v1/vendor/products', [
+            'category_id' => $this->category->id,
+            'brand_id' => $this->brand->id,
+            'name' => 'Crunchy Dog Biscuits',
+            'price' => 22.00,
+            'stock' => 50,
+            'pet_type' => 'dog',
+            'is_active' => 'true',
+            'is_online' => '1',
+            'is_instore' => 'true',
+            'images' => [$imageFile],
+            'variants' => json_encode([
+                ['flavor' => 'Peanut Butter', 'size_lbs' => '2 lbs', 'price' => 22.00, 'stock' => 50]
+            ]),
+        ], ['Accept' => 'application/json']);
+
+        $multipartResponse->assertStatus(201)
+            ->assertJson(['ok' => true]);
+        $multipartProductId = $multipartResponse->json('data.id');
+        $this->assertStringEndsWith('.webp', $multipartResponse->json('data.image'));
+        $this->assertCount(1, $multipartResponse->json('data.variants'));
+
+        // 8. Delete product & verify soft delete
+        $deleteResponse = $this->actingAs($this->vendorUser, 'sanctum')->deleteJson("/api/v1/vendor/products/{$multipartProductId}");
+        $deleteResponse->assertStatus(200)
+            ->assertJson([
+                'ok' => true,
+                'message' => 'Product deleted successfully.',
+            ]);
+        $this->assertSoftDeleted('products', ['id' => $multipartProductId]);
     }
 
     public function test_vendor_can_accept_and_fulfill_order_via_stepper(): void

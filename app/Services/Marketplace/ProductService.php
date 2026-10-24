@@ -70,7 +70,7 @@ class ProductService extends BaseService
 
             // 2. Fetch filtered products with eager loaded relations
             $query = Product::where('store_id', $store->id)
-                ->with(['category:id,name', 'brand:id,name']);
+                ->with(['category:id,name', 'brand:id,name', 'variants']);
 
             if ($status === 'active') {
                 $query->where('is_active', true)->where('stock', '>', 0);
@@ -97,20 +97,26 @@ class ProductService extends BaseService
     }
 
     /**
-     * Create product with 4-step wizard data
+     * Create product with 4-step wizard data.
+     * Supports both uploaded binary images (multipart/form-data) and image URLs/strings (application/json).
      */
     public function storeProduct(Store $store, array $data, Request $request): Product
     {
         $slug = Str::slug($data['name']) . '-' . Str::lower(Str::random(5));
 
-        // 1. Handle product images
+        // 1. Handle uploaded image files via FileUploadTrait (converts to optimized WebP)
         $uploadedImages = [];
         if ($request->hasFile('images')) {
-            foreach ($request->file('images') as $file) {
-                $filename = time() . '_' . Str::slug(pathinfo($file->getClientOriginalName(), PATHINFO_FILENAME)) . '.' . $file->getClientOriginalExtension();
-                $uploadedImages[] = $file->storeAs('products', $filename, 'public');
-            }
+            $uploadedImages = $this->handleMultipleFileUpload($request, 'images', 'products', forceWebp: true);
         }
+
+        // 2. Collect any existing string URLs passed via JSON body or form fields
+        $urlImages = [];
+        if (!empty($data['images']) && is_array($data['images'])) {
+            $urlImages = array_values(array_filter($data['images'], fn($img) => is_string($img) && trim($img) !== ''));
+        }
+
+        $allImages = array_values(array_unique(array_merge($urlImages, $uploadedImages)));
 
         $productData = [
             'store_id' => $store->id,
@@ -128,13 +134,13 @@ class ProductService extends BaseService
             'is_active' => isset($data['is_active']) ? (bool) $data['is_active'] : true,
             'is_online' => isset($data['is_online']) ? (bool) $data['is_online'] : true,
             'is_instore' => isset($data['is_instore']) ? (bool) $data['is_instore'] : true,
-            'images' => $uploadedImages,
+            'images' => $allImages,
         ];
 
         /** @var Product $product */
         $product = $this->create($productData);
 
-        // 2. Handle variants if provided
+        // 3. Handle variants if provided
         if (!empty($data['variants']) && is_array($data['variants'])) {
             foreach ($data['variants'] as $variantData) {
                 ProductVariant::create([
@@ -143,51 +149,138 @@ class ProductService extends BaseService
                     'size_lbs' => $variantData['size_lbs'] ?? null,
                     'price' => $variantData['price'] ?? $product->price,
                     'stock' => $variantData['stock'] ?? $product->stock,
-                    'sku' => $variantData['sku'] ?? ($product->sku . '-' . strtoupper(Str::random(3))),
                 ]);
             }
         }
+
+        // 4. Invalidate related caches
+        $this->flushCacheTags([
+            "stores:{$store->id}:products",
+            "stores:{$store->id}:dashboard",
+            "stores:{$store->id}:analytics",
+            "stores:{$store->id}",
+            'stores',
+            'products',
+            'product_categories',
+        ]);
 
         return $product->load(['category', 'brand', 'variants']);
     }
 
     /**
-     * Update product
+     * Update product details, image assets, and variants.
      */
     public function updateProduct(Product $product, array $data, Request $request): Product
     {
-        $uploadedImages = $product->images ?: [];
+        $currentImages = (array) ($product->images ?: []);
+
+        // 1. Upload any newly provided image files
+        $newUploadedImages = [];
         if ($request->hasFile('images')) {
-            foreach ($request->file('images') as $file) {
-                $filename = time() . '_' . Str::slug(pathinfo($file->getClientOriginalName(), PATHINFO_FILENAME)) . '.' . $file->getClientOriginalExtension();
-                $uploadedImages[] = $file->storeAs('products', $filename, 'public');
-            }
-            $data['images'] = $uploadedImages;
+            $newUploadedImages = $this->handleMultipleFileUpload($request, 'images', 'products', forceWebp: true);
         }
 
-        return $this->update($product->id, $data)->load(['category', 'brand', 'variants']);
+        // 2. Merge or replace images
+        if (array_key_exists('images', $data) && is_array($data['images'])) {
+            $providedUrls = array_values(array_filter($data['images'], fn($img) => is_string($img) && trim($img) !== ''));
+            $data['images'] = array_values(array_unique(array_merge($providedUrls, $newUploadedImages)));
+        } elseif (!empty($newUploadedImages)) {
+            $data['images'] = array_values(array_unique(array_merge($currentImages, $newUploadedImages)));
+        }
+
+        // 3. Update main product attributes
+        /** @var Product $updatedProduct */
+        $updatedProduct = $this->update($product->id, $data);
+
+        // 4. Handle variants synchronization if provided
+        if (array_key_exists('variants', $data)) {
+            $updatedProduct->variants()->delete();
+            if (is_array($data['variants'])) {
+                foreach ($data['variants'] as $variantData) {
+                    ProductVariant::create([
+                        'product_id' => $updatedProduct->id,
+                        'flavor' => $variantData['flavor'] ?? null,
+                        'size_lbs' => $variantData['size_lbs'] ?? null,
+                        'price' => $variantData['price'] ?? $updatedProduct->price,
+                        'stock' => $variantData['stock'] ?? $updatedProduct->stock,
+                    ]);
+                }
+            }
+        }
+
+        // 5. Invalidate related caches
+        $this->flushCacheTags([
+            "stores:{$updatedProduct->store_id}:products",
+            "stores:{$updatedProduct->store_id}:dashboard",
+            "stores:{$updatedProduct->store_id}:analytics",
+            "stores:{$updatedProduct->store_id}",
+            'stores',
+            'products',
+            'product_categories',
+        ]);
+
+        return $updatedProduct->load(['category', 'brand', 'variants']);
     }
 
     /**
-     * Quick stock stepper adjustment
+     * Quick stock stepper adjustment with cache invalidation
      */
     public function updateStock(Product $product, int $newStock): Product
     {
         $product->stock = max(0, $newStock);
         $product->save();
 
+        $this->flushCacheTags([
+            "stores:{$product->store_id}:products",
+            "stores:{$product->store_id}:dashboard",
+            "stores:{$product->store_id}:analytics",
+            "stores:{$product->store_id}",
+            'stores',
+            'products',
+        ]);
+
         return $product;
     }
 
     /**
-     * Toggle product visibility
+     * Toggle product visibility with cache invalidation
      */
     public function toggleActive(Product $product): Product
     {
         $product->is_active = !$product->is_active;
         $product->save();
 
+        $this->flushCacheTags([
+            "stores:{$product->store_id}:products",
+            "stores:{$product->store_id}:dashboard",
+            "stores:{$product->store_id}:analytics",
+            "stores:{$product->store_id}",
+            'stores',
+            'products',
+        ]);
+
         return $product;
+    }
+
+    /**
+     * Delete product safely and invalidate cache
+     */
+    public function deleteProduct(Product $product): bool
+    {
+        $storeId = $product->store_id;
+        $result = $product->delete();
+
+        $this->flushCacheTags([
+            "stores:{$storeId}:products",
+            "stores:{$storeId}:dashboard",
+            "stores:{$storeId}:analytics",
+            "stores:{$storeId}",
+            'stores',
+            'products',
+            'product_categories',
+        ]);
+
+        return (bool) $result;
     }
 
     /**

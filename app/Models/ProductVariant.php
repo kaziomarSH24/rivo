@@ -34,6 +34,16 @@ class ProductVariant extends Model
      */
     public function getRelatedCacheTags(): array
     {
-        return ['products'];
+        $tags = ['products'];
+        if ($this->product_id) {
+            $product = $this->product;
+            if ($product && $product->store_id) {
+                $tags[] = "stores:{$product->store_id}:products";
+                $tags[] = "stores:{$product->store_id}:dashboard";
+                $tags[] = "stores:{$product->store_id}:analytics";
+                $tags[] = "stores:{$product->store_id}";
+            }
+        }
+        return $tags;
     }
 }

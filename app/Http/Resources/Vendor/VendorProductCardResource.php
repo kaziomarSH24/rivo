@@ -8,7 +8,7 @@ use Illuminate\Http\Resources\Json\JsonResource;
 class VendorProductCardResource extends JsonResource
 {
     /**
-     * Transform the product model into an array matching Figma "Products" catalog screen.
+     * Transform the product model into an array matching Figma "Products" catalog screen and Wizard.
      */
     public function toArray(Request $request): array
     {
@@ -63,6 +63,8 @@ class VendorProductCardResource extends JsonResource
             'slug' => $this->slug,
             'sku' => $this->sku,
             'subtitle' => $subtitle,
+            'description' => $this->description,
+            'pet_type' => $this->pet_type,
             'image' => format_media_url($primaryImage, 'products'),
             'images' => array_map(fn($img) => format_media_url($img, 'products'), (array) ($this->images ?? [])),
             'price' => $displayPrice,
@@ -70,6 +72,7 @@ class VendorProductCardResource extends JsonResource
             'original_price' => $strikethroughPrice,
             'formatted_original_price' => $strikethroughPrice ? '$' . number_format($strikethroughPrice, 2) : null,
             'stock' => (int) $this->stock,
+            'low_stock_threshold' => (int) ($this->low_stock_threshold ?? 5),
             'stock_status' => $stockStatus,
             'stock_label' => $stockLabel,
             'status' => $status,
@@ -89,6 +92,15 @@ class VendorProductCardResource extends JsonResource
                 'id' => $this->brand->id,
                 'name' => $this->brand->name,
             ] : null,
+            'variants' => $this->relationLoaded('variants')
+                ? $this->variants->map(fn($v) => [
+                    'id' => $v->id,
+                    'flavor' => $v->flavor,
+                    'size_lbs' => $v->size_lbs,
+                    'price' => (float) $v->price,
+                    'stock' => (int) $v->stock,
+                ])->toArray()
+                : [],
             'created_at' => $this->created_at?->toISOString(),
             'updated_at' => $this->updated_at?->toISOString(),
         ];
