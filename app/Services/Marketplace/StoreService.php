@@ -251,86 +251,130 @@ class StoreService extends BaseService
 
         return (bool) $deleted;
     }
-    /**
-     * Get vendor dashboard overview
+        /**
+     * Get vendor dashboard overview (cached via Redis tags)
      */
     public function getVendorDashboard(Store $store): array
     {
-        $today = Carbon::today();
+        $cacheTags = ['vendor_dashboard', 'stores', "stores:{$store->id}"];
+        $cacheKey = "vendor:dashboard:{$store->id}:" . Carbon::today()->toDateString();
 
-        // 1. Order status counts
-        $orderCounts = [
-            'all' => Order::where('store_id', $store->id)->count(),
-            'new' => Order::where('store_id', $store->id)->where('status', 'new')->count(),
-            'preparing' => Order::where('store_id', $store->id)->where('status', 'preparing')->count(),
-            'ready' => Order::where('store_id', $store->id)->where('status', 'ready_for_pickup')->count(),
-            'out_for_delivery' => Order::where('store_id', $store->id)->where('status', 'out_for_delivery')->count(),
-        ];
+        return Cache::tags($cacheTags)->remember($cacheKey, 300, function () use ($store) {
+            $today = Carbon::today();
 
-        // 2. Today's sales
-        $todaySales = (float) Order::where('store_id', $store->id)
-            ->whereDate('created_at', $today)
-            ->whereNotIn('status', ['cancelled'])
-            ->sum('total');
+            // 1. Order status counts (including 'done' / delivered matching Figma overview)
+            $orderCounts = [
+                'all' => Order::where('store_id', $store->id)->count(),
+                'new' => Order::where('store_id', $store->id)->where('status', 'new')->count(),
+                'preparing' => Order::where('store_id', $store->id)->where('status', 'preparing')->count(),
+                'ready' => Order::where('store_id', $store->id)->where('status', 'ready_for_pickup')->count(),
+                'done' => Order::where('store_id', $store->id)->where('status', 'delivered')->count(),
+                'out_for_delivery' => Order::where('store_id', $store->id)->where('status', 'out_for_delivery')->count(),
+            ];
 
-        $yesterdaySales = (float) Order::where('store_id', $store->id)
-            ->whereDate('created_at', Carbon::yesterday())
-            ->whereNotIn('status', ['cancelled'])
-            ->sum('total');
-
-        $salesGrowth = $yesterdaySales > 0 ? round((($todaySales - $yesterdaySales) / $yesterdaySales) * 100, 1) : 0;
-
-        // 3. Weekly sales chart data (Mon - Sun)
-        $startOfWeek = Carbon::now()->startOfWeek();
-        $weeklySales = [];
-        for ($i = 0; $i < 7; $i++) {
-            $day = (clone $startOfWeek)->addDays($i);
-            $dayTotal = (float) Order::where('store_id', $store->id)
-                ->whereDate('created_at', $day)
+            // 2. Today's sales & growth percentage vs yesterday
+            $todaySales = (float) Order::where('store_id', $store->id)
+                ->whereDate('created_at', $today)
                 ->whereNotIn('status', ['cancelled'])
                 ->sum('total');
 
-            $weeklySales[] = [
-                'day' => $day->format('D'),
-                'date' => $day->format('Y-m-d'),
-                'total' => $dayTotal,
+            $yesterdaySales = (float) Order::where('store_id', $store->id)
+                ->whereDate('created_at', Carbon::yesterday())
+                ->whereNotIn('status', ['cancelled'])
+                ->sum('total');
+
+            $salesGrowth = $yesterdaySales > 0 ? round((($todaySales - $yesterdaySales) / $yesterdaySales) * 100, 1) : 0.0;
+
+            // 3. Weekly sales chart data (Mon - Sun, with is_today indicator)
+            $startOfWeek = Carbon::now()->startOfWeek();
+            $weeklySales = [];
+            $todayDate = $today->toDateString();
+            for ($i = 0; $i < 7; $i++) {
+                $day = (clone $startOfWeek)->addDays($i);
+                $dayDate = $day->toDateString();
+                $dayTotal = (float) Order::where('store_id', $store->id)
+                    ->whereDate('created_at', $day)
+                    ->whereNotIn('status', ['cancelled'])
+                    ->sum('total');
+
+                $weeklySales[] = [
+                    'day' => $day->format('D'),
+                    'date' => $dayDate,
+                    'total' => $dayTotal,
+                    'is_today' => ($dayDate === $todayDate),
+                ];
+            }
+
+            // 4. Low stock alerts (<5 units) formatted for Figma Inventory Alert cards
+            $lowStockProducts = Product::where('store_id', $store->id)
+                ->where('stock', '<=', 5)
+                ->select(['id', 'name', 'stock', 'low_stock_threshold', 'images', 'price'])
+                ->limit(5)
+                ->get()
+                ->map(function ($product) {
+                    $firstImage = null;
+                    if (!empty($product->images)) {
+                        $imgArray = is_array($product->images) ? $product->images : json_decode($product->images, true);
+                        $firstImage = is_array($imgArray) ? ($imgArray[0] ?? null) : null;
+                    }
+                    return [
+                        'id' => $product->id,
+                        'name' => $product->name,
+                        'stock' => (int) $product->stock,
+                        'badge' => $product->stock <= 0 ? 'Out of Stock' : "{$product->stock} left",
+                        'price' => (float) $product->price,
+                        'image' => format_media_url($firstImage, 'products'),
+                    ];
+                });
+
+            // 5. Recent orders formatted for Figma Recent Orders cards
+            $recentOrders = Order::where('store_id', $store->id)
+                ->with(['user:id,name,avatar', 'items'])
+                ->latest()
+                ->limit(5)
+                ->get()
+                ->map(function ($order) {
+                    return [
+                        'id' => $order->id,
+                        'order_number' => $order->order_number,
+                        'customer_name' => $order->user?->name ?? 'Guest Customer',
+                        'customer_avatar' => format_media_url($order->user?->avatar, 'avatars'),
+                        'time_ago' => $order->created_at?->diffForHumans() ?? 'Just now',
+                        'total' => (float) $order->total,
+                        'status' => $order->status,
+                        'status_label' => ucfirst(str_replace('_', ' ', $order->status)),
+                        'items_count' => $order->items ? $order->items->count() : 0,
+                    ];
+                });
+
+            return [
+                'store' => [
+                    'id' => $store->id,
+                    'name' => $store->name,
+                    'logo' => format_media_url($store->logo, 'stores/logos'),
+                    'is_live' => (bool) $store->is_live,
+                    'is_verified' => (bool) $store->is_verified,
+                    'rating' => (float) ($store->rating ?? 5.0),
+                    'reviews_count' => (int) ($store->reviews_count ?? 0),
+                    'fulfillment_rate' => (float) ($store->fulfillment_rate ?? 100.0),
+                    'avg_prep_time_minutes' => (int) ($store->avg_prep_time_minutes ?? 15),
+                ],
+                'order_overview' => $orderCounts,
+                'today_sales' => [
+                    'amount' => $todaySales,
+                    'growth_percentage' => $salesGrowth,
+                    'weekly_chart' => $weeklySales,
+                ],
+                'store_performance' => [
+                    'rating' => (float) ($store->rating ?? 5.0),
+                    'reviews_count' => (int) ($store->reviews_count ?? 0),
+                    'success_rate' => ((float) ($store->fulfillment_rate ?? 100.0)) . '%',
+                    'avg_time' => '< ' . ((int) ($store->avg_prep_time_minutes ?? 15)) . 'm',
+                ],
+                'low_stock_alerts' => $lowStockProducts,
+                'recent_orders' => $recentOrders,
             ];
-        }
-
-        // 4. Low stock alerts
-        $lowStockProducts = Product::where('store_id', $store->id)
-            ->where('stock', '<=', 5)
-            ->select(['id', 'name', 'stock', 'low_stock_threshold', 'images', 'price'])
-            ->limit(5)
-            ->get();
-
-        // 5. Recent orders
-        $recentOrders = Order::where('store_id', $store->id)
-            ->with(['user:id,name,avatar', 'items'])
-            ->latest()
-            ->limit(5)
-            ->get();
-
-        return [
-            'store' => [
-                'id' => $store->id,
-                'name' => $store->name,
-                'logo' => format_media_url($store->logo, 'stores/logos'),
-                'is_live' => (bool) $store->is_live,
-                'is_verified' => (bool) $store->is_verified,
-                'rating' => (float) $store->rating,
-                'fulfillment_rate' => (float) $store->fulfillment_rate,
-                'avg_prep_time_minutes' => (int) $store->avg_prep_time_minutes,
-            ],
-            'order_overview' => $orderCounts,
-            'today_sales' => [
-                'amount' => $todaySales,
-                'growth_percentage' => $salesGrowth,
-                'weekly_chart' => $weeklySales,
-            ],
-            'low_stock_alerts' => $lowStockProducts,
-            'recent_orders' => $recentOrders,
-        ];
+        });
     }
 
     /**

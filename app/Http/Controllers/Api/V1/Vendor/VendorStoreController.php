@@ -9,6 +9,7 @@ use App\Http\Requests\Vendor\UploadStoreDocumentRequest;
 use App\Http\Requests\Vendor\VendorAnalyticsRequest;
 use App\Http\Resources\Vendor\StoreDocumentResource;
 use App\Http\Resources\Vendor\VendorStoreProfileResource;
+use App\Http\Resources\Vendor\VendorDashboardResource;
 use App\Models\Store;
 use App\Models\StoreDocument;
 use App\Services\Marketplace\StoreService;
@@ -50,7 +51,7 @@ class VendorStoreController extends Controller
 
         $data = $this->storeService->getVendorDashboard($store);
 
-        return response_success('Vendor dashboard retrieved successfully.', $data);
+        return response_success('Vendor dashboard retrieved successfully.', new VendorDashboardResource($data));
     }
 
     /**

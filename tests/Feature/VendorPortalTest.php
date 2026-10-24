@@ -71,13 +71,30 @@ class VendorPortalTest extends TestCase
             ])
             ->assertJsonStructure([
                 'data' => [
-                    'store',
-                    'order_overview',
-                    'today_sales',
+                    'greeting',
+                    'store' => [
+                        'id', 'name', 'logo', 'rating', 'reviews_count', 'fulfillment_rate', 'avg_prep_time_minutes'
+                    ],
+                    'order_overview' => [
+                        'all', 'new', 'preparing', 'ready', 'done', 'out_for_delivery'
+                    ],
+                    'today_sales' => [
+                        'amount', 'growth_percentage', 'weekly_chart'
+                    ],
+                    'store_performance' => [
+                        'rating', 'reviews_count', 'success_rate', 'avg_time'
+                    ],
                     'low_stock_alerts',
                     'recent_orders',
                 ]
             ]);
+
+        $this->assertNotEmpty($response->json('data.greeting'));
+        $this->assertArrayHasKey('done', $response->json('data.order_overview'));
+
+        // Verify Redis cache tag & key exist for dashboard
+        $cacheKey = "vendor:dashboard:{$this->store->id}:" . \Carbon\Carbon::today()->toDateString();
+        $this->assertTrue(\Illuminate\Support\Facades\Cache::tags(['vendor_dashboard', 'stores', "stores:{$this->store->id}"])->has($cacheKey));
     }
 
     public function test_vendor_can_view_and_update_business_profile(): void

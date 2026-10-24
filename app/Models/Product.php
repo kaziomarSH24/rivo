@@ -105,6 +105,6 @@ class Product extends Model
      */
     public function getRelatedCacheTags(): array
     {
-        return ['product_categories', 'stores'];
+        return ['product_categories', 'stores', 'vendor_dashboard', "stores:{$this->store_id}"];
     }
 }
