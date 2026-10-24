@@ -10,6 +10,7 @@ use App\Http\Requests\Vendor\VendorAnalyticsRequest;
 use App\Http\Resources\Vendor\StoreDocumentResource;
 use App\Http\Resources\Vendor\VendorStoreProfileResource;
 use App\Http\Resources\Vendor\VendorDashboardResource;
+use App\Http\Resources\Vendor\VendorAnalyticsResource;
 use App\Models\Store;
 use App\Models\StoreDocument;
 use App\Services\Marketplace\StoreService;
@@ -125,6 +126,6 @@ class VendorStoreController extends Controller
         $period = $request->input('period', 'week');
         $data = $this->storeService->getVendorAnalytics($store, $period);
 
-        return response_success('Vendor analytics retrieved successfully.', $data);
+        return response_success('Vendor analytics retrieved successfully.', new VendorAnalyticsResource($data));
     }
 }

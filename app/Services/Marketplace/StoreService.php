@@ -3,6 +3,7 @@
 namespace App\Services\Marketplace;
 
 use App\Models\Order;
+use App\Models\OrderItem;
 use App\Models\Product;
 use App\Models\ProductCategory;
 use App\Models\Store;
@@ -377,45 +378,226 @@ class StoreService extends BaseService
         }, 300, $cacheTags, lock: true);
     }
 
-    /**
-     * Get vendor sales reports and analytics
+        /**
+     * Get vendor sales reports and analytics (cached via Redis tags)
      */
     public function getVendorAnalytics(Store $store, string $period = 'week'): array
     {
-        $query = Order::where('store_id', $store->id);
+        $cacheTags = ["stores:{$store->id}:analytics", "stores:{$store->id}", 'stores'];
+        $cacheKey = "vendor:analytics:{$store->id}:{$period}:" . Carbon::today()->toDateString();
 
-        if ($period === 'today') {
-            $query->whereDate('created_at', Carbon::today());
-        } elseif ($period === 'month') {
-            $query->where('created_at', '>=', Carbon::now()->subDays(30));
-        } else {
-            // default: week
-            $query->where('created_at', '>=', Carbon::now()->startOfWeek());
-        }
+        return $this->rememberCache($cacheKey, function () use ($store, $period) {
+            $now = Carbon::now();
+            $today = Carbon::today();
 
-        $totalSales = (float) (clone $query)->whereNotIn('status', ['cancelled'])->sum('total');
-        $totalOrders = (clone $query)->count();
-        $completedOrders = (clone $query)->where('status', 'delivered')->count();
-        $cancelledOrders = (clone $query)->where('status', 'cancelled')->count();
-        $completionRate = $totalOrders > 0 ? round(($completedOrders / $totalOrders) * 100, 1) : 100.0;
-        $avgOrderValue = $completedOrders > 0 ? round($totalSales / $completedOrders, 2) : 0.0;
+            // 1. Determine date ranges and labels
+            if ($period === 'today') {
+                $startDate = Carbon::today()->startOfDay();
+                $endDate = Carbon::today()->endOfDay();
+                $prevStartDate = Carbon::yesterday()->startOfDay();
+                $prevEndDate = Carbon::yesterday()->endOfDay();
+                $headlineLabel = 'Total Sales (Today)';
+                $vsLabel = 'vs yesterday';
+            } elseif ($period === 'month') {
+                $startDate = Carbon::now()->subDays(30)->startOfDay();
+                $endDate = Carbon::now()->endOfDay();
+                $prevStartDate = Carbon::now()->subDays(60)->startOfDay();
+                $prevEndDate = Carbon::now()->subDays(30)->endOfDay();
+                $headlineLabel = 'Total Sales (Month)';
+                $vsLabel = 'vs last month';
+            } else {
+                // default: week
+                $startDate = Carbon::now()->startOfWeek()->startOfDay();
+                $endDate = Carbon::now()->endOfWeek()->endOfDay();
+                $prevStartDate = Carbon::now()->subWeek()->startOfWeek()->startOfDay();
+                $prevEndDate = Carbon::now()->subWeek()->endOfWeek()->endOfDay();
+                $headlineLabel = 'Total Sales (Week)';
+                $vsLabel = 'vs last week';
+            }
 
-        // Best sellers list
-        $bestSellers = Product::where('store_id', $store->id)
-            ->orderByDesc('sales_count')
-            ->limit(5)
-            ->get(['id', 'name', 'price', 'sales_count', 'images']);
+            // Current period sales & order stats
+            $periodOrdersQuery = Order::where('store_id', $store->id)
+                ->whereBetween('created_at', [$startDate, $endDate]);
 
-        return [
-            'period' => $period,
-            'total_sales' => $totalSales,
-            'total_orders' => $totalOrders,
-            'completed_orders' => $completedOrders,
-            'cancelled_orders' => $cancelledOrders,
-            'completion_rate' => $completionRate,
-            'avg_order_value' => $avgOrderValue,
-            'best_sellers' => $bestSellers,
-        ];
+            $totalSales = (float) (clone $periodOrdersQuery)->whereNotIn('status', ['cancelled'])->sum('total');
+            $totalOrders = (clone $periodOrdersQuery)->count();
+            $completedOrders = (clone $periodOrdersQuery)->where('status', 'delivered')->count();
+            $cancelledOrders = (clone $periodOrdersQuery)->where('status', 'cancelled')->count();
+            $completionRate = $totalOrders > 0 ? round(($completedOrders / $totalOrders) * 100, 1) : 100.0;
+            $cancellationRate = $totalOrders > 0 ? round(($cancelledOrders / $totalOrders) * 100, 1) : 0.0;
+            $avgOrderValue = $completedOrders > 0 ? round($totalSales / $completedOrders, 2) : ($totalOrders > 0 ? round($totalSales / $totalOrders, 2) : 0.0);
+
+            // Previous period sales for growth comparison
+            $prevSales = (float) Order::where('store_id', $store->id)
+                ->whereBetween('created_at', [$prevStartDate, $prevEndDate])
+                ->whereNotIn('status', ['cancelled'])
+                ->sum('total');
+
+            $prevAvgOrderValue = (float) Order::where('store_id', $store->id)
+                ->whereBetween('created_at', [$prevStartDate, $prevEndDate])
+                ->where('status', 'delivered')
+                ->avg('total') ?: 0.0;
+
+            $salesGrowth = $prevSales > 0 ? round((($totalSales - $prevSales) / $prevSales) * 100, 1) : ($totalSales > 0 ? 100.0 : 0.0);
+            $growthDirection = $salesGrowth >= 0 ? 'up' : 'down';
+            $growthPrefix = $salesGrowth >= 0 ? '+' : '';
+            $growthLabel = "{$growthPrefix}{$salesGrowth}% {$vsLabel}";
+
+            $aovDiff = round($avgOrderValue - $prevAvgOrderValue, 2);
+            $aovPrefix = $aovDiff >= 0 ? '+$' : '-$';
+            $aovDiffAbs = abs($aovDiff);
+            $aovSubtext = "{$aovPrefix}{$aovDiffAbs} {$vsLabel}";
+
+            // Orders today count for "+X today" badge
+            $todayOrdersCount = Order::where('store_id', $store->id)
+                ->whereDate('created_at', $today)
+                ->count();
+
+            // 2. Build Chart Data
+            $chart = [];
+            if ($period === 'week') {
+                // 7 days of this week: Monday to Sunday matching Figma
+                $weekStart = Carbon::now()->startOfWeek();
+                for ($i = 0; $i < 7; $i++) {
+                    $dayDate = (clone $weekStart)->addDays($i);
+                    $dayTotal = (float) Order::where('store_id', $store->id)
+                        ->whereDate('created_at', $dayDate)
+                        ->whereNotIn('status', ['cancelled'])
+                        ->sum('total');
+
+                    $chart[] = [
+                        'day' => $dayDate->format('D'),
+                        'date' => $dayDate->toDateString(),
+                        'total' => $dayTotal,
+                        'is_today' => $dayDate->isToday(),
+                        'is_current' => $dayDate->isToday(),
+                    ];
+                }
+            } elseif ($period === 'today') {
+                // 6 time buckets across 24h: 12 AM, 4 AM, 8 AM, 12 PM, 4 PM, 8 PM
+                for ($h = 0; $h < 24; $h += 4) {
+                    $bucketStart = (clone $today)->addHours($h);
+                    $bucketEnd = (clone $today)->addHours($h + 4);
+                    $bucketTotal = (float) Order::where('store_id', $store->id)
+                        ->whereBetween('created_at', [$bucketStart, $bucketEnd])
+                        ->whereNotIn('status', ['cancelled'])
+                        ->sum('total');
+
+                    $chart[] = [
+                        'label' => $bucketStart->format('g A'),
+                        'total' => $bucketTotal,
+                        'is_current' => $now->hour >= $h && $now->hour < ($h + 4),
+                    ];
+                }
+            } else {
+                // Month: 4 weekly blocks
+                for ($w = 3; $w >= 0; $w--) {
+                    $blockStart = Carbon::now()->subWeeks($w)->startOfWeek();
+                    $blockEnd = Carbon::now()->subWeeks($w)->endOfWeek();
+                    $blockTotal = (float) Order::where('store_id', $store->id)
+                        ->whereBetween('created_at', [$blockStart, $blockEnd])
+                        ->whereNotIn('status', ['cancelled'])
+                        ->sum('total');
+
+                    $chart[] = [
+                        'label' => 'W' . (4 - $w),
+                        'start_date' => $blockStart->toDateString(),
+                        'end_date' => $blockEnd->toDateString(),
+                        'total' => $blockTotal,
+                        'is_current' => $w === 0,
+                    ];
+                }
+            }
+
+            // 3. Best Sellers List (with rank, image, sales count, and revenue matching Figma)
+            $topProducts = Product::where('store_id', $store->id)
+                ->orderByDesc('sales_count')
+                ->limit(5)
+                ->get();
+
+            $bestSellers = [];
+            $rank = 1;
+            foreach ($topProducts as $prod) {
+                $revenue = (float) OrderItem::where('product_id', $prod->id)
+                    ->whereHas('order', function ($q) use ($store) {
+                        $q->where('store_id', $store->id)->whereNotIn('status', ['cancelled']);
+                    })
+                    ->sum('total');
+
+                if ($revenue <= 0 && $prod->sales_count > 0) {
+                    $revenue = round($prod->sales_count * (float) $prod->price, 2);
+                }
+
+                $primaryImage = !empty($prod->images) ? (is_array($prod->images) ? $prod->images[0] : $prod->images) : null;
+
+                $bestSellers[] = [
+                    'rank' => $rank++,
+                    'id' => $prod->id,
+                    'name' => $prod->name,
+                    'sales_count' => (int) $prod->sales_count,
+                    'sales_text' => (int) $prod->sales_count . ' sold',
+                    'price' => (float) $prod->price,
+                    'revenue' => $revenue,
+                    'formatted_revenue' => '$' . number_format($revenue, 2),
+                    'image' => format_media_url($primaryImage, 'products'),
+                ];
+            }
+
+            return [
+                'period' => $period,
+                'headline' => [
+                    'label' => $headlineLabel,
+                    'amount' => $totalSales,
+                    'formatted_amount' => '$' . number_format($totalSales, 2),
+                    'growth_percentage' => $salesGrowth,
+                    'growth_direction' => $growthDirection,
+                    'growth_label' => $growthLabel,
+                ],
+                'chart' => $chart,
+                'metrics' => [
+                    'total_orders' => [
+                        'label' => 'Total Orders',
+                        'count' => $totalOrders,
+                        'subtext' => "+{$todayOrdersCount} today",
+                        'icon' => 'box',
+                    ],
+                    'completed_orders' => [
+                        'label' => 'Completed',
+                        'count' => $completedOrders,
+                        'rate' => $completionRate,
+                        'subtext' => "{$completionRate}% rate",
+                        'icon' => 'check',
+                    ],
+                    'cancelled_orders' => [
+                        'label' => 'Cancelled',
+                        'count' => $cancelledOrders,
+                        'rate' => $cancellationRate,
+                        'subtext' => "{$cancellationRate}% rate",
+                        'icon' => 'cross',
+                    ],
+                    'avg_order_value' => [
+                        'label' => 'Avg Order Value',
+                        'amount' => $avgOrderValue,
+                        'formatted_amount' => '$' . number_format($avgOrderValue, 2),
+                        'growth' => $aovSubtext,
+                        'subtext' => $aovSubtext,
+                        'icon' => 'money',
+                    ],
+                ],
+                'best_sellers' => $bestSellers,
+
+                // Top-level fields for backwards-compatibility & tests:
+                'total_sales' => $totalSales,
+                'total_orders' => $totalOrders,
+                'completed_orders' => $completedOrders,
+                'cancelled_orders' => $cancelledOrders,
+                'completion_rate' => $completionRate,
+                'avg_order_value' => $avgOrderValue,
+                'sales_growth_percentage' => $salesGrowth,
+                'sales_growth_text' => $growthLabel,
+                'sales_chart' => $chart,
+            ];
+        }, ttl: 300, tags: $cacheTags, lock: true);
     }
 
     /**

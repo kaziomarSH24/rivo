@@ -105,6 +105,7 @@ class Order extends Model
     {
         return [
             "stores:{$this->store_id}:dashboard",
+            "stores:{$this->store_id}:analytics",
             "stores:{$this->store_id}",
         ];
     }
