@@ -215,6 +215,42 @@ class StoreService extends BaseService
         }
     }
 
+        /**
+     * Upload an individual KYC business document
+     */
+    public function uploadDocument(Store $store, array $data, Request $request): StoreDocument
+    {
+        $file = $request->file('document');
+        $filePath = $file->store('stores/documents', 'public');
+
+        $doc = StoreDocument::create([
+            'store_id' => $store->id,
+            'type' => $data['type'],
+            'file_path' => $filePath,
+            'original_name' => $file->getClientOriginalName(),
+            'status' => 'pending',
+        ]);
+
+        Cache::tags(['stores', "stores:{$store->id}"])->flush();
+
+        return $doc;
+    }
+
+    /**
+     * Delete a KYC document from database and storage disk
+     */
+    public function deleteDocument(Store $store, StoreDocument $document): bool
+    {
+        if ($document->file_path) {
+            $this->deleteFile($document->file_path);
+        }
+
+        $deleted = $document->delete();
+
+        Cache::tags(['stores', "stores:{$store->id}"])->flush();
+
+        return (bool) $deleted;
+    }
     /**
      * Get vendor dashboard overview
      */

@@ -5,13 +5,15 @@ namespace App\Http\Controllers\Api\V1\Vendor;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Vendor\StoreVendorStoreRequest;
 use App\Http\Requests\Vendor\UpdateVendorStoreRequest;
+use App\Http\Requests\Vendor\UploadStoreDocumentRequest;
+use App\Http\Requests\Vendor\VendorAnalyticsRequest;
 use App\Http\Resources\Vendor\StoreDocumentResource;
 use App\Http\Resources\Vendor\VendorStoreProfileResource;
+use App\Models\Store;
 use App\Models\StoreDocument;
 use App\Services\Marketplace\StoreService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Cache;
 
 class VendorStoreController extends Controller
 {
@@ -27,7 +29,7 @@ class VendorStoreController extends Controller
      */
     public function store(StoreVendorStoreRequest $request): JsonResponse
     {
-        $existing = \App\Models\Store::where('user_id', $request->user()->id)->first();
+        $existing = Store::where('user_id', $request->user()->id)->first();
         $store = $this->storeService->registerStore($request->user(), $request->validated(), $request);
 
         $status = $existing ? 200 : 201;
@@ -82,30 +84,14 @@ class VendorStoreController extends Controller
     /**
      * Upload additional KYC Document
      */
-    public function uploadDocument(Request $request): JsonResponse
+    public function uploadDocument(UploadStoreDocumentRequest $request): JsonResponse
     {
         $store = $request->user()->store;
         if (!$store) {
             return response_error('No store registered for this account.', [], 404);
         }
 
-        $request->validate([
-            'type' => 'required|string|in:business_registration_certificate,business_license,tax_certificate,additional_document',
-            'document' => 'required|file|mimes:pdf,jpg,png,jpeg|max:10240',
-        ]);
-
-        $file = $request->file('document');
-        $filePath = $file->store('stores/documents', 'public');
-
-        $doc = StoreDocument::create([
-            'store_id' => $store->id,
-            'type' => $request->input('type'),
-            'file_path' => $filePath,
-            'original_name' => $file->getClientOriginalName(),
-            'status' => 'pending',
-        ]);
-
-        Cache::tags(['stores', "stores:{$store->id}"])->flush();
+        $doc = $this->storeService->uploadDocument($store, $request->validated(), $request);
 
         return response_success('KYC Document uploaded successfully.', new StoreDocumentResource($doc), 201);
     }
@@ -120,13 +106,7 @@ class VendorStoreController extends Controller
             return response_error('Unauthorized access to this document.', [], 403);
         }
 
-        if ($document->file_path) {
-            $this->storeService->deleteFile($document->file_path);
-        }
-
-        $document->delete();
-
-        Cache::tags(['stores', "stores:{$store->id}"])->flush();
+        $this->storeService->deleteDocument($store, $document);
 
         return response_success('Document removed successfully.', []);
     }
@@ -134,14 +114,14 @@ class VendorStoreController extends Controller
     /**
      * Get vendor sales analytics and best sellers
      */
-    public function analytics(Request $request): JsonResponse
+    public function analytics(VendorAnalyticsRequest $request): JsonResponse
     {
         $store = $request->user()->store;
         if (!$store) {
             return response_error('No store registered for this account.', [], 404);
         }
 
-        $period = $request->query('period', 'week');
+        $period = $request->input('period', 'week');
         $data = $this->storeService->getVendorAnalytics($store, $period);
 
         return response_success('Vendor analytics retrieved successfully.', $data);
