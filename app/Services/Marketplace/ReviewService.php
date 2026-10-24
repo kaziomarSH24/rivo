@@ -147,7 +147,7 @@ class ReviewService extends BaseService
 
         // Invalidate reviews cache tags for this specific entity so customers immediately see the new review
         $modelTable = $model->getTable();
-        Cache::tags(['reviews', "{$modelTable}:{$model->id}", $modelTable])->flush();
+        $this->flushCacheTags(['reviews', "{$modelTable}:{$model->id}", $modelTable]);
 
         return $review->load(['user:id,name,avatar']);
     }
@@ -162,7 +162,7 @@ class ReviewService extends BaseService
         $cacheTags = ['reviews', "{$modelTable}:{$modelId}", $modelTable];
         $cacheKey = "reviews_summary:{$modelTable}:{$modelId}:page_{$page}:per_page_{$perPage}";
 
-        return Cache::tags($cacheTags)->remember($cacheKey, 3600, function () use ($model, $page, $perPage) {
+        return $this->rememberCache($cacheKey, function () use ($model, $page, $perPage) {
             $reviewsQuery = $model->reviews();
 
             $totalCount = (clone $reviewsQuery)->count();
@@ -197,7 +197,7 @@ class ReviewService extends BaseService
                     'last_page' => $reviewsList->lastPage(),
                 ],
             ];
-        });
+        }, 3600, $cacheTags);
     }
 
     /**
@@ -254,7 +254,7 @@ class ReviewService extends BaseService
 
             // Clear cache tags
             $modelTable = $model->getTable();
-            Cache::tags(['reviews', "{$modelTable}:{$model->id}", $modelTable])->flush();
+            $this->flushCacheTags(['reviews', "{$modelTable}:{$model->id}", $modelTable]);
         }
 
         return $review->load(['user:id,name,avatar']);

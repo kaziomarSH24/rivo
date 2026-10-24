@@ -51,7 +51,11 @@ class Review extends Model
                 ]);
 
                 $table = $reviewable->getTable();
-                Cache::tags(['reviews', "{$table}:{$reviewable->id}", $table])->flush();
+                try {
+                    if (Cache::supportsTags()) {
+                        Cache::tags(['reviews', "{$table}:{$reviewable->id}", $table])->flush();
+                    }
+                } catch (\Throwable $e) {}
             }
         });
     }

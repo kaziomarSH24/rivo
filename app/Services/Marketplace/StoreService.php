@@ -140,7 +140,7 @@ class StoreService extends BaseService
         $this->saveStoreDocuments($store, $request);
 
         // 5. Invalidate caches
-        Cache::tags(['stores', "stores:{$store->id}"])->flush();
+        $this->flushCacheTags(['stores', "stores:{$store->id}"]);
 
         return $store->load(['documents']);
     }
@@ -183,7 +183,7 @@ class StoreService extends BaseService
         $store->save();
 
         // 4. Invalidate store cache
-        Cache::tags(['stores', "stores:{$store->id}"])->flush();
+        $this->flushCacheTags(['stores', "stores:{$store->id}"]);
 
         return $store->load(['documents']);
     }
@@ -231,7 +231,7 @@ class StoreService extends BaseService
             'status' => 'pending',
         ]);
 
-        Cache::tags(['stores', "stores:{$store->id}"])->flush();
+        $this->flushCacheTags(['stores', "stores:{$store->id}"]);
 
         return $doc;
     }
@@ -247,7 +247,7 @@ class StoreService extends BaseService
 
         $deleted = $document->delete();
 
-        Cache::tags(['stores', "stores:{$store->id}"])->flush();
+        $this->flushCacheTags(['stores', "stores:{$store->id}"]);
 
         return (bool) $deleted;
     }
